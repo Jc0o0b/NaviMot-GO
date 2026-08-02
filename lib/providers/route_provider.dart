@@ -17,6 +17,7 @@ class RouteProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   List<MotorcycleRoute> _savedRoutes = [];
+  List<MotorcycleRoute> _routeAlternatives = [];
   TravelTimeInfo? _travelTimeInfo;
   LatLng? _startLocation;
   LatLng? _endLocation;
@@ -31,6 +32,7 @@ class RouteProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   List<MotorcycleRoute> get savedRoutes => _savedRoutes;
+  List<MotorcycleRoute> get routeAlternatives => List.unmodifiable(_routeAlternatives);
   TravelTimeInfo? get travelTimeInfo => _travelTimeInfo;
   LatLng? get startLocation => _startLocation;
   LatLng? get endLocation => _endLocation;
@@ -63,33 +65,36 @@ class RouteProvider extends ChangeNotifier {
   void planRoute(LatLng start, LatLng end) async {
     _isLoading = true;
     _errorMessage = null;
+    _routeAlternatives = [];
     notifyListeners();
 
     try {
-      var waypoints = List<LatLng>.from(_intermediateWaypoints);
+      final plainWaypoints = List<LatLng>.from(_intermediateWaypoints);
+      var scenicWaypoints = List<LatLng>.from(_intermediateWaypoints);
 
       if (_routeOptions.includeScenicDetours) {
         final tempRoute = await RoutingService.shared.calculateRoute(
           start: start,
           end: end,
-          waypoints: waypoints,
-          avoidHighways: _routeOptions.avoidHighways,
+          waypoints: scenicWaypoints,
+          avoidHighways: true,
         );
         final detour = ScenicRouteCalculator.shared.suggestScenicDetour(tempRoute);
-        if (detour != null) waypoints.addAll(detour);
+        if (detour != null) scenicWaypoints.addAll(detour);
       }
 
-      final route = await RoutingService.shared.calculateRoute(
+      final alternatives = await RoutingService.shared.calculateAlternatives(
         start: start,
         end: end,
-        waypoints: waypoints,
-        avoidHighways: _routeOptions.avoidHighways,
+        waypoints: plainWaypoints,
+        scenicWaypoints: scenicWaypoints,
       );
 
-      _currentRoute = route;
+      _routeAlternatives = alternatives;
+      _currentRoute = _routeOptions.avoidHighways ? alternatives[0] : alternatives[1];
       _travelTimeInfo = PolishTrafficRegulations.shared.calculateTravelTime(
-        route.totalDistance,
-        route.roadTypes,
+        _currentRoute!.totalDistance,
+        _currentRoute!.roadTypes,
       );
       _isLoading = false;
       notifyListeners();
@@ -98,6 +103,15 @@ class RouteProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void selectRoute(MotorcycleRoute route) {
+    _currentRoute = route;
+    _travelTimeInfo = PolishTrafficRegulations.shared.calculateTravelTime(
+      route.totalDistance,
+      route.roadTypes,
+    );
+    notifyListeners();
   }
 
   Future<void> useCurrentLocation() async {

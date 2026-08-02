@@ -4,12 +4,23 @@ import '../providers/settings_provider.dart';
 import '../widgets/home_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  final VoidCallback? onBackToMap;
+  const SettingsScreen({super.key, this.onBackToMap});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ustawienia')),
+      appBar: AppBar(
+        title: const Text('Ustawienia'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Wróć do mapy',
+          onPressed: () {
+            Navigator.of(context).pop();
+            onBackToMap?.call();
+          },
+        ),
+      ),
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return ListView(

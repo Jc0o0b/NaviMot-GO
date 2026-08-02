@@ -22,8 +22,10 @@ class RoutePlanningScreen extends StatefulWidget {
 class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   final _startController = TextEditingController();
   final _endController = TextEditingController();
+  final _waypointController = TextEditingController();
   List<GeocodingResult> _startResults = [];
   List<GeocodingResult> _endResults = [];
+  List<GeocodingResult> _waypointResults = [];
   Timer? _debounce;
   int _searchSequence = 0;
   String? _loadedRouteId;
@@ -34,6 +36,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     _debounce?.cancel();
     _startController.dispose();
     _endController.dispose();
+    _waypointController.dispose();
     super.dispose();
   }
 
@@ -111,6 +114,45 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         onChanged: (q) =>
                             _searchLocation(q, (r) => _endResults = r),
                       ),
+                      const SizedBox(height: 12),
+                      _buildLocationField(
+                        controller: _waypointController,
+                        icon: Icons.add_location_alt_outlined,
+                        color: Colors.blue,
+                        hint: 'Wpisz przystanek po drodze...',
+                        results: _waypointResults,
+                        onSelected: (loc) {
+                          _waypointController.text = loc.displayName;
+                          routeVM.addWaypoint(LatLng(loc.lat, loc.lon));
+                          _waypointResults = [];
+                        },
+                        onChanged: (q) =>
+                            _searchLocation(q, (r) => _waypointResults = r),
+                      ),
+                      if (routeVM.intermediateWaypoints.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            for (var i = 0;
+                                i < routeVM.intermediateWaypoints.length;
+                                i++)
+                              InputChip(
+                                avatar: const Icon(Icons.place,
+                                    size: 16, color: Colors.blue),
+                                label: Text(
+                                  _waypointLabel(
+                                      routeVM.intermediateWaypoints[i], i),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                onDeleted: () => routeVM.removeWaypoint(
+                                    routeVM.intermediateWaypoints[i]),
+                                deleteIconColor: Colors.red,
+                              ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       _buildOptions(routeVM),
                       const SizedBox(height: 16),
@@ -141,22 +183,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                       if (routeVM.currentRoute != null) ...[
                         const SizedBox(height: 24),
                         _buildConfirmation(routeVM),
-                        if (routeVM.intermediateWaypoints.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: routeVM.intermediateWaypoints
-                                .map((w) => InputChip(
-                                      label: const Text('Punkt pośredni',
-                                          style: TextStyle(fontSize: 12)),
-                                      onDeleted: () =>
-                                          routeVM.removeWaypoint(w),
-                                      deleteIconColor: Colors.red,
-                                    ))
-                                .toList(),
-                          ),
-                        ],
                       ],
                     ],
                   ),
@@ -394,44 +420,46 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   void _onSearchChanged(TextEditingController controller, String query) {
     _debounce?.cancel();
     final seq = ++_searchSequence;
+
+    void updateResults(List<GeocodingResult> r) {
+      if (seq != _searchSequence || !mounted) return;
+      setState(() {
+        if (controller == _startController) {
+          _startResults = r;
+        } else if (controller == _endController) {
+          _endResults = r;
+        } else {
+          _waypointResults = r;
+        }
+      });
+    }
+
     if (query.trim().toLowerCase() == 'dom') {
       final home = context.read<SettingsProvider>().home;
       if (home != null) {
-        setState(() {
-          final result = GeocodingResult(
+        updateResults([
+          GeocodingResult(
             displayName: home.name,
             shortName: 'Dom',
             lat: home.lat,
             lon: home.lon,
-          );
-          if (controller == _startController)
-            _startResults = [result];
-          else
-            _endResults = [result];
-        });
+          ),
+        ]);
         return;
       }
     }
     if (query.length < 3) {
-      setState(() {
-        if (controller == _startController)
-          _startResults = [];
-        else
-          _endResults = [];
-      });
+      updateResults([]);
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 600), () {
-      _searchLocation(query, (r) {
-        if (seq != _searchSequence || !mounted) return;
-        setState(() {
-          if (controller == _startController)
-            _startResults = r;
-          else
-            _endResults = r;
-        });
-      });
+      _searchLocation(query, updateResults);
     });
+  }
+
+  String _waypointLabel(LatLng w, int index) {
+    return 'Przystanek ${index + 1} · ${w.latitude.toStringAsFixed(3)}, '
+        '${w.longitude.toStringAsFixed(3)}';
   }
 
   void _searchLocation(

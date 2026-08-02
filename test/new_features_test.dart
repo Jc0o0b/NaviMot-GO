@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:navimot_go/models/road_event.dart';
+import 'package:navimot_go/models/route.dart';
 import 'package:navimot_go/models/route_step.dart';
 import 'package:navimot_go/providers/chat_provider.dart';
 import 'package:navimot_go/providers/events_provider.dart';
+import 'package:navimot_go/providers/route_provider.dart';
 import 'package:navimot_go/services/navigation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,5 +81,55 @@ void main() {
       NavigationService.shared.instructionFor(endOfRoad),
       'na końcu drogi skręć w lewo',
     );
+  });
+
+  test('MotorcycleRoute zachowuje etykietę trasy (wariant)', () {
+    final route = MotorcycleRoute(
+      id: 'r1',
+      waypoints: const [LatLng(52.1, 21.0), LatLng(52.2, 21.1)],
+      name: 'Trasa',
+      totalDistance: 10000,
+      estimatedDuration: 600,
+      scenicScore: 50,
+      roadTypes: const [RoadType.local],
+      label: 'Najszybsza',
+    );
+    final restored = MotorcycleRoute.fromJson(route.toJson());
+    expect(restored.label, 'Najszybsza');
+  });
+
+  test('RouteProvider dodaje i usuwa przystanki bez wyznaczania trasy', () {
+    SharedPreferences.setMockInitialValues({});
+    final provider = RouteProvider();
+    expect(provider.intermediateWaypoints, isEmpty);
+
+    provider.addWaypoint(const LatLng(52.15, 21.05));
+    provider.addWaypoint(const LatLng(52.15, 21.05));
+    expect(provider.intermediateWaypoints.length, 1);
+
+    provider.addWaypoint(const LatLng(52.2, 21.1));
+    expect(provider.intermediateWaypoints.length, 2);
+
+    provider.removeWaypoint(const LatLng(52.15, 21.05));
+    expect(provider.intermediateWaypoints.length, 1);
+    expect(provider.intermediateWaypoints.single.latitude, 52.2);
+  });
+
+  test('RouteProvider.selectRoute ustawia trasę i czas przejazdu', () {
+    SharedPreferences.setMockInitialValues({});
+    final provider = RouteProvider();
+    final fastest = MotorcycleRoute(
+      id: 'fast',
+      waypoints: const [LatLng(52.1, 21.0), LatLng(52.2, 21.1)],
+      name: 'Najszybsza',
+      totalDistance: 50000,
+      estimatedDuration: 1800,
+      scenicScore: 40,
+      roadTypes: const [RoadType.highway],
+      label: 'Najszybsza',
+    );
+    provider.selectRoute(fastest);
+    expect(provider.currentRoute?.id, 'fast');
+    expect(provider.travelTimeInfo, isNotNull);
   });
 }

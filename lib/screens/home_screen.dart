@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const WeatherScreen(),
     POIListScreen(onShowOnMap: () => setState(() => _selectedIndex = 0)),
     const ChatScreen(),
-    const MoreScreen(),
+    MoreScreen(onBackToMap: () => setState(() => _selectedIndex = 0)),
   ];
 
   @override

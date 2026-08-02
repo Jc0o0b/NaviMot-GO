@@ -4,7 +4,8 @@ import 'saved_routes_screen.dart';
 import 'settings_screen.dart';
 
 class MoreScreen extends StatelessWidget {
-  const MoreScreen({super.key});
+  final VoidCallback? onBackToMap;
+  const MoreScreen({super.key, this.onBackToMap});
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +58,8 @@ class MoreScreen extends StatelessWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                          builder: (_) => const SettingsScreen()),
+                          builder: (_) =>
+                              SettingsScreen(onBackToMap: onBackToMap)),
                     ),
                   ),
                 ),

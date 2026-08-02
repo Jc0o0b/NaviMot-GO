@@ -10,6 +10,7 @@ class MotorcycleRoute {
   final int scenicScore;
   final List<RoadType> roadTypes;
   final List<RouteStep> steps;
+  final String? label;
 
   MotorcycleRoute({
     required this.id,
@@ -20,6 +21,7 @@ class MotorcycleRoute {
     required this.scenicScore,
     required this.roadTypes,
     this.steps = const [],
+    this.label,
   });
 
   factory MotorcycleRoute.preview() {
@@ -48,6 +50,7 @@ class MotorcycleRoute {
     'scenicScore': scenicScore,
     'roadTypes': roadTypes.map((t) => t.name).toList(),
     'steps': steps.map((s) => s.toJson()).toList(),
+    'label': label,
   };
 
   factory MotorcycleRoute.fromJson(Map<String, dynamic> json) {
@@ -76,6 +79,7 @@ class MotorcycleRoute {
       steps: (json['steps'] as List? ?? [])
           .map((s) => RouteStep.fromJson(s as Map<String, dynamic>))
           .toList(),
+      label: json['label'] as String?,
     );
   }
 }

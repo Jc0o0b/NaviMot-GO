@@ -545,6 +545,12 @@ class _SummaryOverlay extends StatelessWidget {
                       ],
                     ),
                   ],
+                  if (routeVM.routeAlternatives.length > 1) ...[
+                    const SizedBox(height: 8),
+                    const Divider(height: 1),
+                    const SizedBox(height: 8),
+                    _buildAlternatives(routeVM),
+                  ],
                   const SizedBox(height: 4),
                   _buildMotorcyclistSection(context),
                   const SizedBox(height: 8),
@@ -590,6 +596,26 @@ class _SummaryOverlay extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAlternatives(RouteProvider routeVM) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Warianty trasy',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        for (final alt in routeVM.routeAlternatives)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _AlternativeTile(
+              route: alt,
+              selected: routeVM.currentRoute?.id == alt.id,
+              onTap: () => routeVM.selectRoute(alt),
+            ),
+          ),
+      ],
     );
   }
 
@@ -774,5 +800,87 @@ class _SummaryOverlay extends StatelessWidget {
       case RoadType.unpaved:
         return Icons.terrain;
     }
+  }
+}
+
+class _AlternativeTile extends StatelessWidget {
+  final MotorcycleRoute route;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _AlternativeTile({
+    required this.route,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fastest = route.label == 'Najszybsza';
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? Colors.deepOrange.withValues(alpha: 0.12)
+              : Colors.grey.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? Colors.deepOrange
+                : Colors.grey.withValues(alpha: 0.4),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              fastest ? Icons.bolt : Icons.forest,
+              size: 20,
+              color: fastest ? Colors.orange : Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    route.label ?? 'Trasa',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: selected ? Colors.deepOrange : null,
+                    ),
+                  ),
+                  Text(
+                    '${_formatDuration(route.estimatedDuration)} · ${_formatDistance(route.totalDistance)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle, color: Colors.deepOrange, size: 18)
+            else
+              Text('${route.scenicScore} pkt',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(double seconds) {
+    final h = (seconds / 3600).floor();
+    final m = ((seconds % 3600) / 60).round();
+    if (h > 0) return '$h h $m min';
+    return '$m min';
+  }
+
+  String _formatDistance(double meters) {
+    final km = meters / 1000.0;
+    return km >= 100 ? '${km.toInt()} km' : '${km.toStringAsFixed(1)} km';
   }
 }
