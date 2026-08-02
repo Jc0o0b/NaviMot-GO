@@ -30,6 +30,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   int _searchSequence = 0;
   String? _loadedRouteId;
   bool _navigateOnReady = false;
+  bool _addingWaypoint = false;
 
   @override
   void dispose() {
@@ -115,20 +116,34 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                             _searchLocation(q, (r) => _endResults = r),
                       ),
                       const SizedBox(height: 12),
-                      _buildLocationField(
-                        controller: _waypointController,
-                        icon: Icons.add_location_alt_outlined,
-                        color: Colors.blue,
-                        hint: 'Wpisz przystanek po drodze...',
-                        results: _waypointResults,
-                        onSelected: (loc) {
-                          _waypointController.text = loc.displayName;
-                          routeVM.addWaypoint(LatLng(loc.lat, loc.lon));
-                          _waypointResults = [];
-                        },
-                        onChanged: (q) =>
-                            _searchLocation(q, (r) => _waypointResults = r),
-                      ),
+                      if (_addingWaypoint)
+                        _buildLocationField(
+                          controller: _waypointController,
+                          icon: Icons.add_location_alt_outlined,
+                          color: Colors.blue,
+                          hint: 'Wpisz przystanek po drodze...',
+                          results: _waypointResults,
+                          onSelected: (loc) {
+                            _waypointController.text = loc.displayName;
+                            routeVM.addWaypoint(LatLng(loc.lat, loc.lon));
+                            _waypointResults = [];
+                          },
+                          onChanged: (q) =>
+                              _searchLocation(q, (r) => _waypointResults = r),
+                        )
+                      else
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              setState(() => _addingWaypoint = true),
+                          icon: const Icon(Icons.add_location_alt_outlined),
+                          label: const Text('Dodaj przystanek na trasie'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.blue,
+                            side: BorderSide(
+                                color: Colors.blue.withValues(alpha: 0.5)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       if (routeVM.intermediateWaypoints.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Wrap(
