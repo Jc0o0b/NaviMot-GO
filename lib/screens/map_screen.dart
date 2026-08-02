@@ -1,0 +1,517 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import '../models/route.dart';
+import '../models/weather_point.dart';
+import '../providers/route_provider.dart';
+import '../providers/weather_provider.dart';
+import '../providers/poi_provider.dart';
+import '../widgets/weather_icon.dart';
+import '../widgets/poi_marker.dart';
+import 'navigation_screen.dart';
+
+class MapScreen extends StatefulWidget {
+  const MapScreen({super.key});
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixin {
+  final MapController _mapController = MapController();
+  String? _fittedRouteId;
+  String? _poisLoadedRouteId;
+  bool _poisShownOnMap = false;
+
+  late final AnimationController _drawCtrl;
+  Animation<double>? _drawAnim;
+  List<LatLng> _animPoints = [];
+  int _animCount = 0;
+  bool _animDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _drawCtrl = AnimationController(vsync: this)..addListener(_onDrawTick);
+  }
+
+  @override
+  void dispose() {
+    _drawCtrl.dispose();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final route = context.select<RouteProvider, MotorcycleRoute?>((p) => p.currentRoute);
+    if (route != null && route.id != _fittedRouteId) {
+      _fittedRouteId = route.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || context.read<RouteProvider>().currentRoute == null) return;
+        final r = context.read<RouteProvider>().currentRoute!;
+        _fitRoute(r);
+        _startRouteAnimation(r);
+        _ensurePoisLoaded(r);
+      });
+    }
+
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: route?.waypoints.isNotEmpty == true
+                ? _centerOf(route!.waypoints)
+                : const LatLng(52.2297, 21.0122),
+            initialZoom: route?.waypoints.isNotEmpty == true ? 9.0 : 6.0,
+            onTap: _handleMapTap,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.motorcycle.routes',
+              maxNativeZoom: 19,
+            ),
+            if (route != null) ...[
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: route.waypoints,
+                    color: Colors.white,
+                    strokeWidth: 8,
+                  ),
+                  if (_animDone)
+                    Polyline(
+                      points: route.waypoints,
+                      color: Colors.deepOrange,
+                      strokeWidth: 5,
+                    )
+                  else
+                    Polyline(
+                      points: _animPoints.take(max(1, _animCount)).toList(),
+                      color: Colors.deepOrange,
+                      strokeWidth: 5,
+                    ),
+                ],
+              ),
+              MarkerLayer(
+                markers: [
+                  _buildMarker(route.waypoints.first, Icons.motorcycle, Colors.green),
+                  if (route.waypoints.length > 1)
+                    _buildMarker(route.waypoints.last, Icons.flag, Colors.red),
+                ],
+              ),
+            ],
+            const RepaintBoundary(child: _WeatherMarkersLayer()),
+            RepaintBoundary(child: _POIMarkersLayer(visible: _poisShownOnMap)),
+          ],
+        ),
+        if (route != null)
+          _SummaryOverlay(
+            route: route,
+            onShowPois: () => _ensurePoisLoaded(route),
+            onSave: _saveRoute,
+          ),
+      ],
+    );
+  }
+
+  void _ensurePoisLoaded(MotorcycleRoute route) {
+    if (mounted && _poisShownOnMap && _poisLoadedRouteId == route.id) return;
+    _poisLoadedRouteId = route.id;
+    setState(() => _poisShownOnMap = true);
+    context.read<POIProvider>().loadPOIs(route, radius: 10000);
+  }
+
+  void _handleMapTap(TapPosition tapPosition, LatLng point) {
+    final route = context.read<RouteProvider>().currentRoute;
+    if (route == null || route.waypoints.length < 2) return;
+    final zoom = _mapController.camera.zoom;
+    final metersPerPixel = 156543.03392 * cos(point.latitude * pi / 180) / pow(2, zoom);
+    final threshold = 50 * metersPerPixel;
+    if (_minDistanceToRoute(point, route.waypoints) <= threshold) {
+      _ensurePoisLoaded(route);
+    }
+  }
+
+  double _minDistanceToRoute(LatLng point, List<LatLng> waypoints) {
+    const r = 6371000.0;
+    final cosLat = cos(point.latitude * pi / 180);
+    var minDist = double.infinity;
+    for (final w in waypoints) {
+      final dLat = (w.latitude - point.latitude) * pi / 180;
+      final dLon = (w.longitude - point.longitude) * pi / 180;
+      final d = sqrt(dLat * dLat + dLon * dLon * cosLat * cosLat) * r;
+      if (d < minDist) minDist = d;
+    }
+    return minDist;
+  }
+
+  void _saveRoute(BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
+    final already = routeVM.savedRoutes.any((r) => r.id == route.id);
+    if (!already) routeVM.saveRoute(route);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(already ? 'Trasa jest już w Zapisane' : 'Trasa zapisana w Zapisane'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _fitRoute(MotorcycleRoute route) {
+    try {
+      _mapController.fitCamera(CameraFit.coordinates(
+        coordinates: route.waypoints,
+        padding: const EdgeInsets.fromLTRB(48, 80, 48, 300),
+      ));
+    } catch (_) {}
+  }
+
+  void _startRouteAnimation(MotorcycleRoute route) {
+    _animPoints = _decimatePoints(route.waypoints, 400);
+    _animCount = 1;
+    _animDone = false;
+    final km = route.totalDistance / 1000.0;
+    final millis = (2200 + km * 20).round().clamp(2200, 5500);
+    _drawCtrl.duration = Duration(milliseconds: millis);
+    _drawAnim = CurvedAnimation(parent: _drawCtrl, curve: Curves.easeInOut);
+    _drawCtrl.forward(from: 0);
+  }
+
+  void _onDrawTick() {
+    if (_animPoints.isEmpty) return;
+    final anim = _drawAnim;
+    final total = _animPoints.length;
+    if (_drawCtrl.isCompleted) {
+      if (!_animDone) {
+        _animDone = true;
+        setState(() => _animCount = total);
+      }
+      return;
+    }
+    final target = anim == null ? total : max(1, (anim.value * total).round());
+    if (target != _animCount && (target - _animCount).abs() >= 6) {
+      setState(() => _animCount = target);
+    }
+  }
+
+  List<LatLng> _decimatePoints(List<LatLng> points, int target) {
+    if (points.length <= target) return points;
+    final out = <LatLng>[];
+    for (var i = 0; i < target; i++) {
+      out.add(points[(i * (points.length - 1) / (target - 1)).round()]);
+    }
+    return out;
+  }
+
+  Marker _buildMarker(LatLng point, IconData icon, Color color) {
+    return Marker(
+      point: point,
+      width: 42,
+      height: 42,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Icon(icon, color: color, size: 24),
+      ),
+    );
+  }
+
+  LatLng _centerOf(List<LatLng> points) {
+    double lat = 0, lon = 0;
+    for (final p in points) { lat += p.latitude; lon += p.longitude; }
+    return LatLng(lat / points.length, lon / points.length);
+  }
+}
+
+class _WeatherMarkersLayer extends StatelessWidget {
+  const _WeatherMarkersLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    final weatherVM = context.watch<WeatherProvider>();
+    if (weatherVM.weatherPoints.isEmpty) return const SizedBox.shrink();
+    return MarkerLayer(
+      markers: weatherVM.weatherPoints.map((wp) => Marker(
+        point: wp.coordinate,
+        width: 44,
+        height: 44,
+        child: WeatherIconWidget(point: wp),
+      )).toList(),
+    );
+  }
+}
+
+class _POIMarkersLayer extends StatelessWidget {
+  final bool visible;
+  const _POIMarkersLayer({required this.visible});
+
+  @override
+  Widget build(BuildContext context) {
+    final poiVM = context.watch<POIProvider>();
+    if (!visible || poiVM.pointsOfInterest.isEmpty) return const SizedBox.shrink();
+    return MarkerLayer(
+      markers: poiVM.pointsOfInterest.take(30).map((poi) => Marker(
+        point: poi.coordinate,
+        width: 34,
+        height: 34,
+        child: POIMarkerWidget(poi: poi),
+      )).toList(),
+    );
+  }
+}
+
+class _SummaryOverlay extends StatelessWidget {
+  final MotorcycleRoute route;
+  final VoidCallback onShowPois;
+  final void Function(BuildContext, RouteProvider, MotorcycleRoute) onSave;
+
+  const _SummaryOverlay({
+    required this.route,
+    required this.onShowPois,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final routeVM = context.watch<RouteProvider>();
+    final weatherVM = context.watch<WeatherProvider>();
+    final poiVM = context.watch<POIProvider>();
+    final travel = routeVM.travelTimeInfo;
+
+    return Positioned(
+      left: 8,
+      right: 8,
+      bottom: 0,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Card(
+            margin: EdgeInsets.zero,
+            elevation: 4,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => NavigationScreen(route: route),
+                    )),
+                    icon: const Icon(Icons.navigation, size: 20),
+                    label: const Text('Start nawigacji'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.route, size: 18, color: Colors.deepOrange),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          route.name,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Icon(Icons.star, size: 16, color: Colors.amber),
+                      const SizedBox(width: 2),
+                      Text('${route.scenicScore}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  if (travel != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _summaryItem(Icons.schedule, travel.formattedDrivingTime, 'Czas jazdy'),
+                        _summaryItem(Icons.timer_outlined, travel.formattedTotalTime, 'Z przerwami'),
+                        _summaryItem(Icons.straighten, travel.formattedDistance, 'Dystans'),
+                        _summaryItem(Icons.speed, travel.formattedSpeed, 'Średnia'),
+                      ],
+                    ),
+                  ],
+                  if (route.roadTypes.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final t in route.roadTypes)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.deepOrange, width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_roadIcon(t), size: 13, color: Colors.deepOrange),
+                                const SizedBox(width: 4),
+                                Text(t.label,
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (weatherVM.weatherPoints.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _weatherItem(weatherVM.predominantCondition),
+                        _summaryItem(Icons.thermostat, '${weatherVM.averageTemperature.round()}°', 'Temperatura'),
+                        _summaryItem(Icons.air, '${weatherVM.maxWindSpeed.round()} km/h', 'Wiatr'),
+                        _summaryItem(Icons.water_drop, '${weatherVM.maxPrecipitationProbability.round()}%', 'Opady'),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: poiVM.isLoading ? null : onShowPois,
+                          icon: poiVM.isLoading
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.place, size: 18),
+                          label: Text(poiVM.isLoading ? 'Szukam miejsc...' : 'Dla motocyklisty (10 km)'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.deepOrange,
+                            side: const BorderSide(color: Colors.deepOrange, width: 1.5),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => onSave(context, routeVM, route),
+                          icon: const Icon(Icons.bookmark, size: 18),
+                          label: const Text('Zapisz trasę'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (weatherVM.weatherAlert != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(weatherVM.weatherAlert!,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryItem(IconData icon, String value, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: Colors.deepOrange),
+            const SizedBox(width: 3),
+            Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _weatherItem(WeatherCondition condition) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(_conditionIcon(condition), size: 14, color: Colors.deepOrange),
+        const SizedBox(height: 2),
+        Text(_conditionLabel(condition), style: const TextStyle(fontSize: 9, color: Colors.grey)),
+      ],
+    );
+  }
+
+  IconData _conditionIcon(WeatherCondition c) {
+    switch (c) {
+      case WeatherCondition.sunny: return Icons.wb_sunny;
+      case WeatherCondition.partlyCloudy: return Icons.cloud;
+      case WeatherCondition.cloudy: return Icons.cloud_queue;
+      case WeatherCondition.rain: return Icons.water;
+      case WeatherCondition.heavyRain: return Icons.thunderstorm;
+      case WeatherCondition.thunderstorm: return Icons.flash_on;
+      case WeatherCondition.snow: return Icons.ac_unit;
+      case WeatherCondition.fog: return Icons.foggy;
+      case WeatherCondition.windy: return Icons.air;
+    }
+  }
+
+  String _conditionLabel(WeatherCondition c) {
+    switch (c) {
+      case WeatherCondition.sunny: return 'Słonecznie';
+      case WeatherCondition.partlyCloudy: return 'Częściowo';
+      case WeatherCondition.cloudy: return 'Pochmurno';
+      case WeatherCondition.rain: return 'Deszcz';
+      case WeatherCondition.heavyRain: return 'Ulewa';
+      case WeatherCondition.thunderstorm: return 'Burza';
+      case WeatherCondition.snow: return 'Śnieg';
+      case WeatherCondition.fog: return 'Mgła';
+      case WeatherCondition.windy: return 'Wietrznie';
+    }
+  }
+
+  IconData _roadIcon(RoadType type) {
+    switch (type) {
+      case RoadType.highway: return Icons.local_shipping;
+      case RoadType.expressway: return Icons.directions_car;
+      case RoadType.national: return Icons.route;
+      case RoadType.regional: return Icons.swap_horiz;
+      case RoadType.local: return Icons.home;
+      case RoadType.scenic: return Icons.forest;
+      case RoadType.unpaved: return Icons.terrain;
+    }
+  }
+}
