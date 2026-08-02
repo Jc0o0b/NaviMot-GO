@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import '../models/point_of_interest.dart';
 import '../models/route.dart';
 import '../models/weather_point.dart';
+import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
+import '../widgets/event_widgets.dart';
 import '../widgets/weather_icon.dart';
 import '../widgets/poi_marker.dart';
 import 'navigation_screen.dart';
@@ -26,6 +29,7 @@ class _MapScreenState extends State<MapScreen>
   String? _poisLoadedRouteId;
   bool _poisShownOnMap = false;
   String? _focusedPoiId;
+  LatLng _mapCenter = const LatLng(52.2297, 21.0122);
 
   late final AnimationController _drawCtrl;
   Animation<double>? _drawAnim;
@@ -86,6 +90,10 @@ class _MapScreenState extends State<MapScreen>
                 : const LatLng(52.2297, 21.0122),
             initialZoom: route?.waypoints.isNotEmpty == true ? 9.0 : 6.0,
             onTap: _handleMapTap,
+            onPositionChanged: (camera, hasGesture) {
+              final center = camera.center;
+              if (center != null) _mapCenter = center;
+            },
           ),
           children: [
             TileLayer(
@@ -126,12 +134,36 @@ class _MapScreenState extends State<MapScreen>
             ],
             const RepaintBoundary(child: _WeatherMarkersLayer()),
             RepaintBoundary(child: _POIMarkersLayer(visible: _poisShownOnMap)),
+            const RepaintBoundary(child: _EventMarkersLayer()),
           ],
+        ),
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          right: 12,
+          child: FloatingActionButton.small(
+            heroTag: 'report-event',
+            tooltip: 'Zgłoś wydarzenie na drodze',
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            onPressed: () => showEventReportSheet(
+              context,
+              fallbackLocation: _mapCenter,
+            ),
+            child: const Icon(Icons.warning_amber_rounded),
+          ),
         ),
         if (route != null)
           _SummaryOverlay(
             route: route,
+            poiVM: context.watch<POIProvider>(),
             onShowPois: () => _ensurePoisLoaded(route),
+            onPoiSelected: (poi) {
+              setState(() => _poisShownOnMap = true);
+              context.read<POIProvider>().selectPOI(poi);
+              try {
+                _mapController.move(poi.coordinate, 13);
+              } catch (_) {}
+            },
             onSave: _saveRoute,
           ),
       ],
@@ -334,14 +366,51 @@ class _POIMarkersLayer extends StatelessWidget {
   }
 }
 
+class _EventMarkersLayer extends StatelessWidget {
+  const _EventMarkersLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    final eventsVM = context.watch<EventsProvider>();
+    final markers = <Marker>[
+      for (final e in eventsVM.events.take(60))
+        Marker(
+          point: LatLng(e.lat, e.lon),
+          width: 36,
+          height: 36,
+          child: GestureDetector(
+            onTap: () => showEventDetail(context, e),
+            child: RoadEventMarker(type: e.type),
+          ),
+        ),
+      for (final p in eventsVM.importantPlaces.take(40))
+        Marker(
+          point: LatLng(p.lat, p.lon),
+          width: 40,
+          height: 40,
+          child: GestureDetector(
+            onTap: () => showImportantPlaceDetail(context, p),
+            child: const ImportantPlaceMarker(),
+          ),
+        ),
+    ];
+    if (markers.isEmpty) return const SizedBox.shrink();
+    return MarkerLayer(markers: markers);
+  }
+}
+
 class _SummaryOverlay extends StatelessWidget {
   final MotorcycleRoute route;
+  final POIProvider poiVM;
   final VoidCallback onShowPois;
+  final void Function(PointOfInterest) onPoiSelected;
   final void Function(BuildContext, RouteProvider, MotorcycleRoute) onSave;
 
   const _SummaryOverlay({
     required this.route,
+    required this.poiVM,
     required this.onShowPois,
+    required this.onPoiSelected,
     required this.onSave,
   });
 
@@ -349,8 +418,8 @@ class _SummaryOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final routeVM = context.watch<RouteProvider>();
     final weatherVM = context.watch<WeatherProvider>();
-    final poiVM = context.watch<POIProvider>();
     final travel = routeVM.travelTimeInfo;
+    final surface = Theme.of(context).colorScheme.surface;
 
     return Positioned(
       left: 8,
@@ -362,7 +431,7 @@ class _SummaryOverlay extends StatelessWidget {
           Card(
             margin: EdgeInsets.zero,
             elevation: 4,
-            color: Colors.white,
+            color: surface,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
@@ -476,46 +545,20 @@ class _SummaryOverlay extends StatelessWidget {
                       ],
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: poiVM.isLoading ? null : onShowPois,
-                          icon: poiVM.isLoading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.place, size: 18),
-                          label: Text(poiVM.isLoading
-                              ? 'Szukam miejsc...'
-                              : 'Dla motocyklisty (10 km)'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.deepOrange,
-                            side: const BorderSide(
-                                color: Colors.deepOrange, width: 1.5),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            textStyle: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => onSave(context, routeVM, route),
-                          icon: const Icon(Icons.bookmark, size: 18),
-                          label: const Text('Zapisz trasę'),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            textStyle: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 4),
+                  _buildMotorcyclistSection(context),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => onSave(context, routeVM, route),
+                    icon: const Icon(Icons.bookmark, size: 18),
+                    label: const Text('Zapisz trasę'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.deepOrange,
+                      side: const BorderSide(color: Colors.deepOrange, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -548,6 +591,93 @@ class _SummaryOverlay extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildMotorcyclistSection(BuildContext context) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      leading: const Icon(Icons.attractions, color: Colors.deepOrange),
+      title: const Text('Dla motocyklisty',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+      subtitle: Text(
+        poiVM.pointsOfInterest.isEmpty
+            ? 'Miejsca wzdłuż trasy'
+            : '${poiVM.pointsOfInterest.length} miejsc wzdłuż trasy',
+        style: const TextStyle(fontSize: 11),
+      ),
+      children: [
+        if (poiVM.isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (poiVM.pointsOfInterest.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: TextButton.icon(
+              onPressed: onShowPois,
+              icon: const Icon(Icons.search, size: 18),
+              label: const Text('Wyszukaj miejsca wzdłuż trasy'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.deepOrange,
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: min(poiVM.pointsOfInterest.length, 20),
+              itemBuilder: (_, i) {
+                final poi = poiVM.pointsOfInterest[i];
+                return ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor:
+                        Colors.orange.withValues(alpha: 0.2),
+                    child: Icon(_poiIcon(poi.category),
+                        color: Colors.orange, size: 16),
+                  ),
+                  title: Text(poi.name,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  subtitle: Text(poi.category.label,
+                      style: const TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right, size: 18),
+                  onTap: () => onPoiSelected(poi),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  IconData _poiIcon(POICategory category) {
+    switch (category) {
+      case POICategory.viewpoint:
+        return Icons.visibility;
+      case POICategory.mountainPass:
+        return Icons.terrain;
+      case POICategory.scenicRoad:
+        return Icons.route;
+      case POICategory.fuel:
+        return Icons.local_gas_station;
+      case POICategory.service:
+        return Icons.build;
+      case POICategory.accommodation:
+        return Icons.hotel;
+      case POICategory.restaurant:
+        return Icons.restaurant;
+    }
   }
 
   Widget _summaryItem(IconData icon, String value, String label) {

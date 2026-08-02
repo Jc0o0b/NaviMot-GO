@@ -2,14 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import '../models/home_address.dart';
-import '../models/point_of_interest.dart';
 import '../models/route.dart';
-import '../providers/poi_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
 import '../services/geocoding_service.dart';
+import '../widgets/home_sheet.dart';
 import '../widgets/section_header.dart';
 import 'navigation_screen.dart';
 
@@ -41,15 +39,14 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<RouteProvider, WeatherProvider, POIProvider>(
-      builder: (context, routeVM, weatherVM, poiVM, _) {
+    return Consumer2<RouteProvider, WeatherProvider>(
+      builder: (context, routeVM, weatherVM, _) {
         final route = routeVM.currentRoute;
         if (route != null && route.id != _loadedRouteId) {
           _loadedRouteId = route.id;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             weatherVM.loadWeather(route);
-            poiVM.loadPOIs(route);
             if (_navigateOnReady) {
               _navigateOnReady = false;
               widget.onRoutePlanned?.call();
@@ -89,6 +86,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         color: Colors.green,
                         hint: 'Wpisz miejsce startu...',
                         results: _startResults,
+                        onHomeTap: _useHomeAsStart,
                         onSelected: (loc) {
                           _startController.text = loc.displayName;
                           routeVM.setStartLocation(LatLng(loc.lat, loc.lon));
@@ -104,6 +102,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         color: Colors.red,
                         hint: 'Wpisz miejsce docelowe...',
                         results: _endResults,
+                        onHomeTap: _useHomeAsEnd,
                         onSelected: (loc) {
                           _endController.text = loc.displayName;
                           routeVM.setEndLocation(LatLng(loc.lat, loc.lon));
@@ -158,9 +157,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                                 .toList(),
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        SizedBox(
-                            height: 380, child: _buildPOIPanel(routeVM, poiVM)),
                       ],
                     ],
                   ),
@@ -179,8 +175,9 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     required Color color,
     required String hint,
     required List<GeocodingResult> results,
-    required Function(GeocodingResult) onSelected,
-    required Function(String) onChanged,
+    required void Function(GeocodingResult) onSelected,
+    required void Function(String) onChanged,
+    VoidCallback? onHomeTap,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,6 +188,18 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
             const SizedBox(width: 8),
             Text(hint,
                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const Spacer(),
+            if (onHomeTap != null)
+              TextButton.icon(
+                onPressed: onHomeTap,
+                icon: const Icon(Icons.home, size: 16),
+                label: const Text('Dom',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.deepOrange,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 4),
@@ -232,6 +241,28 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           ),
       ],
     );
+  }
+
+  void _useHomeAsStart() {
+    final home = context.read<SettingsProvider>().home;
+    if (home == null) {
+      _showHomeSheet();
+      return;
+    }
+    final routeVM = context.read<RouteProvider>();
+    routeVM.setStartLocation(LatLng(home.lat, home.lon));
+    _startController.text = home.name;
+  }
+
+  void _useHomeAsEnd() {
+    final home = context.read<SettingsProvider>().home;
+    if (home == null) {
+      _showHomeSheet();
+      return;
+    }
+    final routeVM = context.read<RouteProvider>();
+    routeVM.setEndLocation(LatLng(home.lat, home.lon));
+    _endController.text = home.name;
   }
 
   Widget _buildOptions(RouteProvider routeVM) {
@@ -356,132 +387,31 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     );
   }
 
-  Widget _buildPOIPanel(RouteProvider routeVM, POIProvider poiVM) {
-    final pois = poiVM.pointsOfInterest;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: Row(
-              children: [
-                const Icon(Icons.attractions, color: Colors.orange, size: 18),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text('Dla motocyklisty (10 km)',
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.bold)),
-                ),
-                if (poiVM.isLoading)
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: poiVM.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : poiVM.errorMessage != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.cloud_off,
-                                  color: Colors.grey, size: 28),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Nie udało się pobrać miejsc.\nSpróbuj ponownie później.',
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.grey),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : pois.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Text(
-                                'Brak miejsc w promieniu 10 km od trasy',
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.grey),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            itemCount: pois.take(15).length,
-                            itemBuilder: (_, i) =>
-                                _buildPOITile(routeVM, pois[i]),
-                          ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPOITile(RouteProvider routeVM, PointOfInterest poi) {
-    final added = routeVM.intermediateWaypoints.any((w) =>
-        (w.latitude - poi.coordinate.latitude).abs() < 0.0001 &&
-        (w.longitude - poi.coordinate.longitude).abs() < 0.0001);
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        dense: true,
-        leading: CircleAvatar(
-          radius: 18,
-          backgroundColor: Colors.orange.withValues(alpha: 0.2),
-          child: Icon(_poiIcon(poi.category), color: Colors.orange, size: 18),
-        ),
-        title: Text(poi.name,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
-        subtitle:
-            Text(poi.category.label, style: const TextStyle(fontSize: 11)),
-        trailing: IconButton(
-          tooltip: added ? 'Usuń z trasy' : 'Dodaj jako punkt trasy',
-          icon: Icon(added ? Icons.remove_circle : Icons.add_circle,
-              color: added ? Colors.green : Colors.orange),
-          onPressed: () => added
-              ? routeVM.removeWaypoint(poi.coordinate)
-              : routeVM.addWaypoint(poi.coordinate),
-        ),
-      ),
-    );
-  }
-
   void _showHomeSheet() {
-    final settings = context.read<SettingsProvider>();
-    final routeVM = context.read<RouteProvider>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => _HomeSheet(
-        settings: settings,
-        onUseAsStart: (home) {
-          Navigator.pop(ctx);
-          routeVM.setStartLocation(LatLng(home.lat, home.lon));
-          _startController.text = home.name;
-        },
-      ),
-    );
+    showHomeSheet(context);
   }
 
   void _onSearchChanged(TextEditingController controller, String query) {
     _debounce?.cancel();
     final seq = ++_searchSequence;
+    if (query.trim().toLowerCase() == 'dom') {
+      final home = context.read<SettingsProvider>().home;
+      if (home != null) {
+        setState(() {
+          final result = GeocodingResult(
+            displayName: home.name,
+            shortName: 'Dom',
+            lat: home.lat,
+            lon: home.lon,
+          );
+          if (controller == _startController)
+            _startResults = [result];
+          else
+            _endResults = [result];
+        });
+        return;
+      }
+    }
     if (query.length < 3) {
       setState(() {
         if (controller == _startController)
@@ -508,155 +438,5 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       String query, Function(List<GeocodingResult>) onResult) async {
     final results = await GeocodingService.shared.search(query);
     if (mounted) onResult(results);
-  }
-
-  IconData _poiIcon(POICategory category) {
-    switch (category) {
-      case POICategory.viewpoint:
-        return Icons.visibility;
-      case POICategory.mountainPass:
-        return Icons.terrain;
-      case POICategory.scenicRoad:
-        return Icons.route;
-      case POICategory.fuel:
-        return Icons.local_gas_station;
-      case POICategory.service:
-        return Icons.build;
-      case POICategory.accommodation:
-        return Icons.hotel;
-      case POICategory.restaurant:
-        return Icons.restaurant;
-    }
-  }
-}
-
-class _HomeSheet extends StatefulWidget {
-  final SettingsProvider settings;
-  final void Function(HomeAddress) onUseAsStart;
-
-  const _HomeSheet({required this.settings, required this.onUseAsStart});
-
-  @override
-  State<_HomeSheet> createState() => _HomeSheetState();
-}
-
-class _HomeSheetState extends State<_HomeSheet> {
-  final _controller = TextEditingController();
-  Timer? _debounce;
-  List<GeocodingResult> _results = [];
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final home = widget.settings.home;
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Adres domowy',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            const Text('Użyj adresu domowego jako punktu startu.',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-            if (home != null) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: Colors.orange.shade50,
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.home,
-                          color: Colors.deepOrange, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(home.name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                      IconButton(
-                        tooltip: 'Użyj jako start',
-                        icon: const Icon(Icons.play_arrow, color: Colors.green),
-                        onPressed: () => widget.onUseAsStart(home),
-                      ),
-                      IconButton(
-                        tooltip: 'Usuń',
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => widget.settings.clearHome(),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: 'Wpisz adres domowy...',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (q) => _onSearch(q),
-            ),
-            if (_results.isNotEmpty)
-              Container(
-                constraints: const BoxConstraints(maxHeight: 180),
-                margin: const EdgeInsets.only(top: 8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _results.length,
-                  itemBuilder: (_, i) => ListTile(
-                    dense: true,
-                    title: Text(_results[i].displayName,
-                        style: const TextStyle(fontSize: 13)),
-                    onTap: () {
-                      final r = _results[i];
-                      widget.settings.setHome(HomeAddress(
-                        name: r.displayName,
-                        lat: r.lat,
-                        lon: r.lon,
-                      ));
-                      setState(() => _results = []);
-                    },
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _onSearch(String query) {
-    _debounce?.cancel();
-    if (query.length < 3) {
-      setState(() => _results = []);
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 600), () async {
-      final results = await GeocodingService.shared.search(query);
-      if (mounted) setState(() => _results = results);
-    });
   }
 }

@@ -235,10 +235,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
         _nextStepIndex > _spokenStepIndex &&
         _distanceToNext <= 250) {
       _spokenStepIndex = _nextStepIndex;
-      _speak(NavigationService.shared.instructionFor(
-        steps[_nextStepIndex],
-        distanceMeters: _distanceToNext,
-      ));
+      _speak(NavigationService.shared.instructionFor(steps[_nextStepIndex]));
     }
   }
 
@@ -316,80 +313,111 @@ class _NavigationScreenState extends State<NavigationScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: RoadView2D(
-              path: _remainingPath(),
-              headingDeg: _effectiveHeading(),
-            ),
-          ),
-          Positioned(
-            right: 8,
-            bottom: 116,
-            width: 150,
-            height: 190,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ColoredBox(
-                color: Colors.white,
-                child: FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter:
-                        _currentLocation ?? widget.route.waypoints.first,
-                    initialZoom: 15,
-                    onMapReady: () {
-                      _mapReady = true;
-                      final loc = _currentLocation;
-                      if (loc != null) {
-                        _moveCameraTo(loc);
-                      } else {
-                        try {
-                          _mapController.fitCamera(CameraFit.coordinates(
-                            coordinates: widget.route.waypoints,
-                            padding: const EdgeInsets.all(10),
-                          ));
-                        } catch (_) {}
-                      }
-                    },
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.motorcycle.routes',
-                      tileProvider:
-                          widget.tileProvider ?? NetworkTileProvider(),
+            child: Column(
+              children: [
+                Container(
+                  height: 150,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFDCE7D0),
+                    border: Border(
+                      bottom: BorderSide(color: Colors.black12),
                     ),
-                    if (widget.route.waypoints.length > 1)
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: widget.route.waypoints,
-                            color: Colors.deepOrange,
-                            strokeWidth: 3,
-                          ),
-                        ],
+                  ),
+                  child: RoadView2D(
+                    path: _remainingPath(),
+                    headingDeg: _effectiveHeading(),
+                  ),
+                ),
+                Expanded(
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter:
+                          _currentLocation ?? widget.route.waypoints.first,
+                      initialZoom: 15,
+                      onMapReady: () {
+                        _mapReady = true;
+                        final loc = _currentLocation;
+                        if (loc != null) {
+                          _moveCameraTo(loc);
+                        } else {
+                          try {
+                            _mapController.fitCamera(CameraFit.coordinates(
+                              coordinates: widget.route.waypoints,
+                              padding: const EdgeInsets.all(10),
+                            ));
+                          } catch (_) {}
+                        }
+                      },
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.motorcycle.routes',
+                        tileProvider:
+                            widget.tileProvider ?? NetworkTileProvider(),
                       ),
-                    if (_currentLocation != null)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _currentLocation!,
-                            width: 30,
-                            height: 30,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 2),
+                      if (widget.route.waypoints.length > 1) ...[
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: widget.route.waypoints,
+                              color: Colors.white,
+                              strokeWidth: 6,
+                            ),
+                            Polyline(
+                              points: widget.route.waypoints,
+                              color: Colors.deepOrange,
+                              strokeWidth: 4,
+                            ),
+                          ],
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: widget.route.waypoints.first,
+                              width: 32,
+                              height: 32,
+                              child: const Icon(Icons.motorcycle,
+                                  color: Colors.green, size: 28),
+                            ),
+                            Marker(
+                              point: widget.route.waypoints.last,
+                              width: 32,
+                              height: 32,
+                              child: const Icon(Icons.flag,
+                                  color: Colors.red, size: 28),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (_currentLocation != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _currentLocation!,
+                              width: 30,
+                              height: 30,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: Colors.white, width: 2),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                        color: Colors.black38, blurRadius: 4)
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                  ],
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           if (_currentLocation == null)
@@ -437,14 +465,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final steps = widget.route.steps;
     if (steps.isEmpty) return const SizedBox.shrink();
     final step = steps[_nextStepIndex];
-    final instruction = NavigationService.shared.instructionFor(
-      step,
-      distanceMeters: _distanceToNext,
-    );
+    final instruction = NavigationService.shared.instructionFor(step);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
@@ -487,10 +512,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: SafeArea(
         top: false,
@@ -549,7 +574,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
       alignment: Alignment.center,
       padding: const EdgeInsets.all(24),
       child: Card(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(

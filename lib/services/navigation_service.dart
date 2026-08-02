@@ -5,10 +5,8 @@ class NavigationService {
   static NavigationService get shared => _instance;
   NavigationService._();
 
-  String instructionFor(RouteStep step, {double? distanceMeters}) {
-    final verb = _verbFor(step);
-    final prefix = _distancePrefix(distanceMeters);
-    return (prefix + verb).trim();
+  String instructionFor(RouteStep step) {
+    return _verbFor(step);
   }
 
   bool shouldSpeak(RouteStep step) {
@@ -87,22 +85,5 @@ class NavigationService {
   String _roadSuffix(String name) {
     if (name.isEmpty) return '';
     return ' w ulicę $name';
-  }
-
-  String _distancePrefix(double? distanceMeters) {
-    if (distanceMeters == null || distanceMeters <= 30) return '';
-    if (distanceMeters < 1000) {
-      return 'Za ${distanceMeters.round()} metrów ';
-    }
-    final km = distanceMeters / 1000.0;
-    if (km >= 10) return 'Za ${km.round()} kilometrów ';
-    return 'Za ${km.toStringAsFixed(1).replaceAll('.', ',')} ${_kmDeclension(km)} ';
-  }
-
-  String _kmDeclension(double km) {
-    final rounded = km.round();
-    if (rounded == 1) return 'kilometr';
-    if (rounded >= 2 && rounded <= 4) return 'kilometry';
-    return 'kilometrów';
   }
 }
