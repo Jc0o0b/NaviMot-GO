@@ -21,9 +21,17 @@ Future<void> main() async {
   stderr.writeln('Server running on http://localhost:$port');
 
   await for (final request in server) {
-    final path = request.uri.path == '/' ? '/index.html' : request.uri.path;
-    final file = File('${root.path}$path');
+    var path = request.uri.path;
+    if (path == '/' || path.isEmpty) path = '/index.html';
 
+    // Strip the base-href prefix used for GitHub Pages builds so the same
+    // release bundle works when served locally from the root.
+    if (path.startsWith('/NaviMot-GO')) {
+      path = path.substring('/NaviMot-GO'.length);
+      if (path.isEmpty || path == '/') path = '/index.html';
+    }
+
+    final file = File('${root.path}$path');
     if (await file.exists()) {
       final bytes = await file.readAsBytes();
       final ext = path.substring(path.lastIndexOf('.'));

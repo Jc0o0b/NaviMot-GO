@@ -13,7 +13,8 @@ import '../widgets/road_view_2d.dart';
 
 class NavigationScreen extends StatefulWidget {
   final MotorcycleRoute route;
-  const NavigationScreen({super.key, required this.route});
+  final TileProvider? tileProvider;
+  const NavigationScreen({super.key, required this.route, this.tileProvider});
 
   @override
   State<NavigationScreen> createState() => _NavigationScreenState();
@@ -24,6 +25,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   StreamSubscription<Position>? _positionSub;
   FlutterTts? _tts;
   Timer? _simTimer;
+  Timer? _simFallbackTimer;
   bool _demoMode = false;
   double _simAlong = 0;
   double _simSpeedMs = 0;
@@ -76,6 +78,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _startTracking() async {
+    _simFallbackTimer = Timer(const Duration(seconds: 10), _maybeEnterDemo);
     LatLng? location;
     try {
       location = await LocationService.getCurrentLocation();
@@ -94,7 +97,14 @@ class _NavigationScreenState extends State<NavigationScreen> {
       ).listen(_onPosition, onError: (_) {});
       streamOk = true;
     } catch (_) {}
-    if (!streamOk) {
+    if (!streamOk && _currentLocation == null) {
+      _simFallbackTimer?.cancel();
+      _startSimulation();
+    }
+  }
+
+  void _maybeEnterDemo() {
+    if (mounted && _currentLocation == null && !_demoMode) {
       _startSimulation();
     }
   }
@@ -167,6 +177,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   void _onPosition(Position pos) {
     if (!mounted) return;
+    if (_demoMode) {
+      _simTimer?.cancel();
+      _demoMode = false;
+    }
     final loc = LatLng(pos.latitude, pos.longitude);
     final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
     final heading = pos.heading.isFinite ? pos.heading : 0.0;
@@ -290,6 +304,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void dispose() {
     _positionSub?.cancel();
     _simTimer?.cancel();
+    _simFallbackTimer?.cancel();
     _tts?.stop();
     _mapController.dispose();
     super.dispose();
@@ -341,6 +356,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       urlTemplate:
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.motorcycle.routes',
+                      tileProvider:
+                          widget.tileProvider ?? NetworkTileProvider(),
                     ),
                     if (widget.route.waypoints.length > 1)
                       PolylineLayer(
