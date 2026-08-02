@@ -23,6 +23,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
   final MapController _mapController = MapController();
   StreamSubscription<Position>? _positionSub;
   FlutterTts? _tts;
+  Timer? _simTimer;
+  bool _demoMode = false;
+  double _simAlong = 0;
+  double _simSpeedMs = 0;
 
   late final List<double> _waypointCumulative;
   late final List<double> _stepCumulative;
@@ -72,11 +76,15 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _startTracking() async {
-    final location = await LocationService.getCurrentLocation();
+    LatLng? location;
+    try {
+      location = await LocationService.getCurrentLocation();
+    } catch (_) {}
     if (location != null && mounted) {
       setState(() => _currentLocation = location);
       _moveCameraTo(location);
     }
+    bool streamOk = false;
     try {
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -84,7 +92,77 @@ class _NavigationScreenState extends State<NavigationScreen> {
           distanceFilter: 5,
         ),
       ).listen(_onPosition, onError: (_) {});
+      streamOk = true;
     } catch (_) {}
+    if (!streamOk) {
+      _startSimulation();
+    }
+  }
+
+  void _startSimulation() {
+    final pts = widget.route.waypoints;
+    if (pts.isEmpty) return;
+    _simTimer?.cancel();
+    _demoMode = true;
+    _simSpeedMs = 50 / 3.6;
+    final loc = _currentLocation ?? pts.first;
+    setState(() {
+      _currentLocation = loc;
+      _simAlong = _waypointCumulative.length > 1 ? _distanceAlong(loc) : 0;
+    });
+    _moveCameraTo(loc);
+    _simTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _advanceSimulation(),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Brak sygnału GPS — uruchomiono tryb demo'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  void _advanceSimulation() {
+    final pts = widget.route.waypoints;
+    if (pts.length < 2) return;
+    final total = _waypointCumulative.last;
+    _simAlong += _simSpeedMs;
+    if (_simAlong >= total) {
+      _simAlong = total;
+      _simTimer?.cancel();
+    }
+    final loc = _pointAtAlong(_simAlong);
+    final ahead = _pointAtAlong(min(_simAlong + 6, total));
+    setState(() {
+      _currentLocation = loc;
+      _currentSpeed = 50 + 5 * sin(_simAlong / 400);
+      _heading = _bearing(loc, ahead);
+      _updateProgress(loc);
+    });
+    _moveCameraTo(loc);
+    if (_simAlong >= total) {
+      setState(() => _arrived = true);
+    }
+  }
+
+  LatLng _pointAtAlong(double along) {
+    final pts = widget.route.waypoints;
+    var i = 0;
+    while (i < pts.length - 2 && _waypointCumulative[i + 1] < along) {
+      i++;
+    }
+    final segStart = _waypointCumulative[i];
+    final segLen = _waypointCumulative[i + 1] - segStart;
+    final t = segLen <= 0 ? 0.0 : ((along - segStart) / segLen).clamp(0.0, 1.0);
+    final a = pts[i];
+    final b = pts[i + 1];
+    return LatLng(
+      a.latitude + (b.latitude - a.latitude) * t,
+      a.longitude + (b.longitude - a.longitude) * t,
+    );
   }
 
   void _onPosition(Position pos) {
@@ -120,7 +198,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
     final step = steps[_currentStepIndex];
     final stepLen = step.distance > 0 ? step.distance : 1.0;
-    final fracInStep = ((along - _stepCumulative[_currentStepIndex]) / stepLen).clamp(0.0, 1.0);
+    final fracInStep = ((along - _stepCumulative[_currentStepIndex]) / stepLen)
+        .clamp(0.0, 1.0);
     var rem = step.duration * (1 - fracInStep);
     for (var i = _currentStepIndex + 1; i < steps.length; i++) {
       rem += steps[i].duration;
@@ -210,6 +289,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   @override
   void dispose() {
     _positionSub?.cancel();
+    _simTimer?.cancel();
     _tts?.stop();
     _mapController.dispose();
     super.dispose();
@@ -238,7 +318,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 child: FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: _currentLocation ?? widget.route.waypoints.first,
+                    initialCenter:
+                        _currentLocation ?? widget.route.waypoints.first,
                     initialZoom: 15,
                     onMapReady: () {
                       _mapReady = true;
@@ -257,7 +338,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.motorcycle.routes',
                     ),
                     if (widget.route.waypoints.length > 1)
@@ -281,7 +363,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.blue,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
+                                border:
+                                    Border.all(color: Colors.white, width: 2),
                               ),
                             ),
                           ),
@@ -301,7 +384,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                        SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                         SizedBox(width: 12),
                         Text('Lokalizowanie...'),
                       ],
@@ -324,8 +410,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               right: 0,
               child: _buildBottomBar(),
             ),
-          if (_arrived)
-            Positioned.fill(child: _buildArrivalOverlay()),
+          if (_arrived) Positioned.fill(child: _buildArrivalOverlay()),
         ],
       ),
     );
@@ -355,12 +440,14 @@ class _NavigationScreenState extends State<NavigationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(instruction,
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
                 if (step.name.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(step.name,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ],
             ),
@@ -378,9 +465,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ? '${remainingKm.round()} km'
             : '${remainingKm.toStringAsFixed(1)} km';
     final min = (_remainingDuration / 60).round();
-    final timeText = min >= 60
-        ? 'ok. ${min ~/ 60}h ${min % 60}min'
-        : 'ok. $min min';
+    final timeText =
+        min >= 60 ? 'ok. ${min ~/ 60}h ${min % 60}min' : 'ok. $min min';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -399,8 +485,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('${_currentSpeed.round()} km/h',
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
-                  const Text('Prędkość', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepOrange)),
+                  const Text('Prędkość',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  if (_demoMode)
+                    const Text('Tryb demo',
+                        style:
+                            TextStyle(fontSize: 10, color: Colors.deepOrange)),
                 ],
               ),
             ),
@@ -410,8 +504,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Zostało $distText',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(timeText, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(timeText,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
@@ -445,10 +541,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
               const Icon(Icons.flag, size: 56, color: Colors.green),
               const SizedBox(height: 12),
               const Text('Dotarłeś do celu!',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               Text('${_formatDistance(_remainingDistance)} od celu',
-                style: const TextStyle(color: Colors.grey)),
+                  style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
@@ -465,30 +561,46 @@ class _NavigationScreenState extends State<NavigationScreen> {
   IconData _arrowFor(RouteStep step) {
     final m = step.modifier ?? '';
     switch (step.type) {
-      case 'depart': return Icons.navigation;
-      case 'arrive': return Icons.flag;
+      case 'depart':
+        return Icons.navigation;
+      case 'arrive':
+        return Icons.flag;
       case 'roundabout':
       case 'rotary':
-      case 'exit roundabout': return Icons.roundabout_right;
-      case 'merge': return Icons.merge;
-      case 'on ramp': return Icons.ramp_right;
-      case 'off ramp': return Icons.ramp_left;
-      case 'fork': return m.contains('left') ? Icons.fork_left : Icons.fork_right;
+      case 'exit roundabout':
+        return Icons.roundabout_right;
+      case 'merge':
+        return Icons.merge;
+      case 'on ramp':
+        return Icons.ramp_right;
+      case 'off ramp':
+        return Icons.ramp_left;
+      case 'fork':
+        return m.contains('left') ? Icons.fork_left : Icons.fork_right;
       case 'turn':
       case 'end of road':
       case 'new name':
       case 'continue':
       case 'restricted':
         switch (m) {
-          case 'left': return Icons.turn_left;
-          case 'right': return Icons.turn_right;
-          case 'slight left': return Icons.turn_slight_left;
-          case 'slight right': return Icons.turn_slight_right;
-          case 'sharp left': return Icons.turn_sharp_left;
-          case 'sharp right': return Icons.turn_sharp_right;
-          case 'uturn': return Icons.u_turn_left;
-          case 'straight': return Icons.straight;
-          default: return Icons.straight;
+          case 'left':
+            return Icons.turn_left;
+          case 'right':
+            return Icons.turn_right;
+          case 'slight left':
+            return Icons.turn_slight_left;
+          case 'slight right':
+            return Icons.turn_slight_right;
+          case 'sharp left':
+            return Icons.turn_sharp_left;
+          case 'sharp right':
+            return Icons.turn_sharp_right;
+          case 'uturn':
+            return Icons.u_turn_left;
+          case 'straight':
+            return Icons.straight;
+          default:
+            return Icons.straight;
         }
       default:
         return Icons.straight;
@@ -522,7 +634,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
       final perp = sqrt(pow(px - cx, 2) + pow(py - cy, 2));
       if (perp < best) {
         best = perp;
-        bestAlong = _waypointCumulative[i] + sqrt(pow(cx - ax, 2) + pow(cy - ay, 2));
+        bestAlong =
+            _waypointCumulative[i] + sqrt(pow(cx - ax, 2) + pow(cy - ay, 2));
       }
     }
     return bestAlong;
@@ -586,7 +699,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
       final dLon = (b.longitude - a.longitude) * pi / 180;
       final la1 = a.latitude * pi / 180;
       final la2 = b.latitude * pi / 180;
-      final h = pow(sin(dLat / 2), 2) + cos(la1) * cos(la2) * pow(sin(dLon / 2), 2);
+      final h =
+          pow(sin(dLat / 2), 2) + cos(la1) * cos(la2) * pow(sin(dLon / 2), 2);
       final d = 2 * r * asin(sqrt(h));
       cum.add(cum[i - 1] + d);
     }

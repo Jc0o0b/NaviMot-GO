@@ -19,7 +19,8 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixin {
+class _MapScreenState extends State<MapScreen>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   String? _fittedRouteId;
   String? _poisLoadedRouteId;
@@ -47,11 +48,13 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    final route = context.select<RouteProvider, MotorcycleRoute?>((p) => p.currentRoute);
+    final route =
+        context.select<RouteProvider, MotorcycleRoute?>((p) => p.currentRoute);
     if (route != null && route.id != _fittedRouteId) {
       _fittedRouteId = route.id;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || context.read<RouteProvider>().currentRoute == null) return;
+        if (!mounted || context.read<RouteProvider>().currentRoute == null)
+          return;
         final r = context.read<RouteProvider>().currentRoute!;
         _fitRoute(r);
         _startRouteAnimation(r);
@@ -114,7 +117,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
               ),
               MarkerLayer(
                 markers: [
-                  _buildMarker(route.waypoints.first, Icons.motorcycle, Colors.green),
+                  _buildMarker(
+                      route.waypoints.first, Icons.motorcycle, Colors.green),
                   if (route.waypoints.length > 1)
                     _buildMarker(route.waypoints.last, Icons.flag, Colors.red),
                 ],
@@ -146,7 +150,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     final route = context.read<RouteProvider>().currentRoute;
     if (route == null || route.waypoints.length < 2) return;
     final zoom = _mapController.camera.zoom;
-    final metersPerPixel = 156543.03392 * cos(point.latitude * pi / 180) / pow(2, zoom);
+    final metersPerPixel =
+        156543.03392 * cos(point.latitude * pi / 180) / pow(2, zoom);
     final threshold = 50 * metersPerPixel;
     if (_minDistanceToRoute(point, route.waypoints) <= threshold) {
       _ensurePoisLoaded(route);
@@ -166,12 +171,15 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     return minDist;
   }
 
-  void _saveRoute(BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
+  void _saveRoute(
+      BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
     final already = routeVM.savedRoutes.any((r) => r.id == route.id);
     if (!already) routeVM.saveRoute(route);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(already ? 'Trasa jest już w Zapisane' : 'Trasa zapisana w Zapisane'),
+        content: Text(already
+            ? 'Trasa jest już w Zapisane'
+            : 'Trasa zapisana w Zapisane'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -241,7 +249,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
   LatLng _centerOf(List<LatLng> points) {
     double lat = 0, lon = 0;
-    for (final p in points) { lat += p.latitude; lon += p.longitude; }
+    for (final p in points) {
+      lat += p.latitude;
+      lon += p.longitude;
+    }
     return LatLng(lat / points.length, lon / points.length);
   }
 }
@@ -249,17 +260,37 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 class _WeatherMarkersLayer extends StatelessWidget {
   const _WeatherMarkersLayer();
 
+  static final Distance _dist = Distance();
+
   @override
   Widget build(BuildContext context) {
     final weatherVM = context.watch<WeatherProvider>();
     if (weatherVM.weatherPoints.isEmpty) return const SizedBox.shrink();
+    final poiVM = context.watch<POIProvider>();
+    final poiCoords = <LatLng>[
+      for (final p in poiVM.pointsOfInterest) p.coordinate,
+      if (poiVM.selectedPOI != null) poiVM.selectedPOI!.coordinate,
+    ];
+    final shown = <WeatherPoint>[];
+    for (final wp in weatherVM.weatherPoints) {
+      if (poiCoords.any((c) => _dist.distance(wp.coordinate, c) < 1200)) {
+        continue;
+      }
+      if (shown.any((s) => _dist.distance(s.coordinate, wp.coordinate) < 500)) {
+        continue;
+      }
+      shown.add(wp);
+    }
+    if (shown.isEmpty) return const SizedBox.shrink();
     return MarkerLayer(
-      markers: weatherVM.weatherPoints.map((wp) => Marker(
-        point: wp.coordinate,
-        width: 44,
-        height: 44,
-        child: WeatherIconWidget(point: wp),
-      )).toList(),
+      markers: shown
+          .map((wp) => Marker(
+                point: wp.coordinate,
+                width: 44,
+                height: 44,
+                child: WeatherIconWidget(point: wp),
+              ))
+          .toList(),
     );
   }
 }
@@ -272,13 +303,17 @@ class _POIMarkersLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final poiVM = context.watch<POIProvider>();
     final selected = poiVM.selectedPOI;
-    if (!visible || poiVM.pointsOfInterest.isEmpty) return const SizedBox.shrink();
-    final markers = poiVM.pointsOfInterest.take(30).map((poi) => Marker(
-      point: poi.coordinate,
-      width: 34,
-      height: 34,
-      child: POIMarkerWidget(poi: poi),
-    )).toList();
+    if (!visible || poiVM.pointsOfInterest.isEmpty)
+      return const SizedBox.shrink();
+    final markers = poiVM.pointsOfInterest
+        .take(30)
+        .map((poi) => Marker(
+              point: poi.coordinate,
+              width: 40,
+              height: 40,
+              child: POIMarkerWidget(poi: poi),
+            ))
+        .toList();
     if (selected != null) {
       markers.add(Marker(
         point: selected.coordinate,
@@ -328,7 +363,8 @@ class _SummaryOverlay extends StatelessWidget {
             margin: EdgeInsets.zero,
             elevation: 4,
             color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Column(
@@ -336,7 +372,8 @@ class _SummaryOverlay extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    onPressed: () =>
+                        Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => NavigationScreen(route: route),
                     )),
                     icon: const Icon(Icons.navigation, size: 20),
@@ -345,18 +382,21 @@ class _SummaryOverlay extends StatelessWidget {
                       backgroundColor: Colors.deepOrange,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.route, size: 18, color: Colors.deepOrange),
+                      const Icon(Icons.route,
+                          size: 18, color: Colors.deepOrange),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           route.name,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -364,7 +404,8 @@ class _SummaryOverlay extends StatelessWidget {
                       const Icon(Icons.star, size: 16, color: Colors.amber),
                       const SizedBox(width: 2),
                       Text('${route.scenicScore}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   if (travel != null) ...[
@@ -372,10 +413,14 @@ class _SummaryOverlay extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _summaryItem(Icons.schedule, travel.formattedDrivingTime, 'Czas jazdy'),
-                        _summaryItem(Icons.timer_outlined, travel.formattedTotalTime, 'Z przerwami'),
-                        _summaryItem(Icons.straighten, travel.formattedDistance, 'Dystans'),
-                        _summaryItem(Icons.speed, travel.formattedSpeed, 'Średnia'),
+                        _summaryItem(Icons.schedule,
+                            travel.formattedDrivingTime, 'Czas jazdy'),
+                        _summaryItem(Icons.timer_outlined,
+                            travel.formattedTotalTime, 'Z przerwami'),
+                        _summaryItem(Icons.straighten, travel.formattedDistance,
+                            'Dystans'),
+                        _summaryItem(
+                            Icons.speed, travel.formattedSpeed, 'Średnia'),
                       ],
                     ),
                   ],
@@ -387,19 +432,25 @@ class _SummaryOverlay extends StatelessWidget {
                       children: [
                         for (final t in route.roadTypes)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade50,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.deepOrange, width: 1),
+                              border: Border.all(
+                                  color: Colors.deepOrange, width: 1),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(_roadIcon(t), size: 13, color: Colors.deepOrange),
+                                Icon(_roadIcon(t),
+                                    size: 13, color: Colors.deepOrange),
                                 const SizedBox(width: 4),
                                 Text(t.label,
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87)),
                               ],
                             ),
                           ),
@@ -412,9 +463,16 @@ class _SummaryOverlay extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _weatherItem(weatherVM.predominantCondition),
-                        _summaryItem(Icons.thermostat, '${weatherVM.averageTemperature.round()}°', 'Temperatura'),
-                        _summaryItem(Icons.air, '${weatherVM.maxWindSpeed.round()} km/h', 'Wiatr'),
-                        _summaryItem(Icons.water_drop, '${weatherVM.maxPrecipitationProbability.round()}%', 'Opady'),
+                        _summaryItem(
+                            Icons.thermostat,
+                            '${weatherVM.averageTemperature.round()}°',
+                            'Temperatura'),
+                        _summaryItem(Icons.air,
+                            '${weatherVM.maxWindSpeed.round()} km/h', 'Wiatr'),
+                        _summaryItem(
+                            Icons.water_drop,
+                            '${weatherVM.maxPrecipitationProbability.round()}%',
+                            'Opady'),
                       ],
                     ),
                   ],
@@ -425,14 +483,22 @@ class _SummaryOverlay extends StatelessWidget {
                         child: OutlinedButton.icon(
                           onPressed: poiVM.isLoading ? null : onShowPois,
                           icon: poiVM.isLoading
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.place, size: 18),
-                          label: Text(poiVM.isLoading ? 'Szukam miejsc...' : 'Dla motocyklisty (10 km)'),
+                          label: Text(poiVM.isLoading
+                              ? 'Szukam miejsc...'
+                              : 'Dla motocyklisty (10 km)'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.deepOrange,
-                            side: const BorderSide(color: Colors.deepOrange, width: 1.5),
+                            side: const BorderSide(
+                                color: Colors.deepOrange, width: 1.5),
                             padding: const EdgeInsets.symmetric(vertical: 10),
-                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -444,7 +510,8 @@ class _SummaryOverlay extends StatelessWidget {
                           label: const Text('Zapisz trasę'),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 10),
-                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -464,11 +531,15 @@ class _SummaryOverlay extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18),
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.amber, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(weatherVM.weatherAlert!,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -488,7 +559,9 @@ class _SummaryOverlay extends StatelessWidget {
           children: [
             Icon(icon, size: 14, color: Colors.deepOrange),
             const SizedBox(width: 3),
-            Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
         Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
@@ -502,48 +575,74 @@ class _SummaryOverlay extends StatelessWidget {
       children: [
         Icon(_conditionIcon(condition), size: 14, color: Colors.deepOrange),
         const SizedBox(height: 2),
-        Text(_conditionLabel(condition), style: const TextStyle(fontSize: 9, color: Colors.grey)),
+        Text(_conditionLabel(condition),
+            style: const TextStyle(fontSize: 9, color: Colors.grey)),
       ],
     );
   }
 
   IconData _conditionIcon(WeatherCondition c) {
     switch (c) {
-      case WeatherCondition.sunny: return Icons.wb_sunny;
-      case WeatherCondition.partlyCloudy: return Icons.cloud;
-      case WeatherCondition.cloudy: return Icons.cloud_queue;
-      case WeatherCondition.rain: return Icons.water;
-      case WeatherCondition.heavyRain: return Icons.thunderstorm;
-      case WeatherCondition.thunderstorm: return Icons.flash_on;
-      case WeatherCondition.snow: return Icons.ac_unit;
-      case WeatherCondition.fog: return Icons.foggy;
-      case WeatherCondition.windy: return Icons.air;
+      case WeatherCondition.sunny:
+        return Icons.wb_sunny;
+      case WeatherCondition.partlyCloudy:
+        return Icons.cloud;
+      case WeatherCondition.cloudy:
+        return Icons.cloud_queue;
+      case WeatherCondition.rain:
+        return Icons.water;
+      case WeatherCondition.heavyRain:
+        return Icons.thunderstorm;
+      case WeatherCondition.thunderstorm:
+        return Icons.flash_on;
+      case WeatherCondition.snow:
+        return Icons.ac_unit;
+      case WeatherCondition.fog:
+        return Icons.foggy;
+      case WeatherCondition.windy:
+        return Icons.air;
     }
   }
 
   String _conditionLabel(WeatherCondition c) {
     switch (c) {
-      case WeatherCondition.sunny: return 'Słonecznie';
-      case WeatherCondition.partlyCloudy: return 'Częściowo';
-      case WeatherCondition.cloudy: return 'Pochmurno';
-      case WeatherCondition.rain: return 'Deszcz';
-      case WeatherCondition.heavyRain: return 'Ulewa';
-      case WeatherCondition.thunderstorm: return 'Burza';
-      case WeatherCondition.snow: return 'Śnieg';
-      case WeatherCondition.fog: return 'Mgła';
-      case WeatherCondition.windy: return 'Wietrznie';
+      case WeatherCondition.sunny:
+        return 'Słonecznie';
+      case WeatherCondition.partlyCloudy:
+        return 'Częściowo';
+      case WeatherCondition.cloudy:
+        return 'Pochmurno';
+      case WeatherCondition.rain:
+        return 'Deszcz';
+      case WeatherCondition.heavyRain:
+        return 'Ulewa';
+      case WeatherCondition.thunderstorm:
+        return 'Burza';
+      case WeatherCondition.snow:
+        return 'Śnieg';
+      case WeatherCondition.fog:
+        return 'Mgła';
+      case WeatherCondition.windy:
+        return 'Wietrznie';
     }
   }
 
   IconData _roadIcon(RoadType type) {
     switch (type) {
-      case RoadType.highway: return Icons.local_shipping;
-      case RoadType.expressway: return Icons.directions_car;
-      case RoadType.national: return Icons.route;
-      case RoadType.regional: return Icons.swap_horiz;
-      case RoadType.local: return Icons.home;
-      case RoadType.scenic: return Icons.forest;
-      case RoadType.unpaved: return Icons.terrain;
+      case RoadType.highway:
+        return Icons.local_shipping;
+      case RoadType.expressway:
+        return Icons.directions_car;
+      case RoadType.national:
+        return Icons.route;
+      case RoadType.regional:
+        return Icons.swap_horiz;
+      case RoadType.local:
+        return Icons.home;
+      case RoadType.scenic:
+        return Icons.forest;
+      case RoadType.unpaved:
+        return Icons.terrain;
     }
   }
 }

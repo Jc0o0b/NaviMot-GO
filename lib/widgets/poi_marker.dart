@@ -15,19 +15,26 @@ class POIMarkerWidget extends StatelessWidget {
         border: Border.all(color: Colors.deepOrange, width: 1.5),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 2)],
       ),
-      child: Icon(_icon(), color: Colors.deepOrange, size: 16),
+      child: Icon(_icon(), color: Colors.deepOrange, size: 20),
     );
   }
 
   IconData _icon() {
     switch (poi.category) {
-      case POICategory.viewpoint: return Icons.visibility;
-      case POICategory.mountainPass: return Icons.terrain;
-      case POICategory.scenicRoad: return Icons.route;
-      case POICategory.fuel: return Icons.local_gas_station;
-      case POICategory.service: return Icons.build;
-      case POICategory.accommodation: return Icons.hotel;
-      case POICategory.restaurant: return Icons.restaurant;
+      case POICategory.viewpoint:
+        return Icons.visibility;
+      case POICategory.mountainPass:
+        return Icons.terrain;
+      case POICategory.scenicRoad:
+        return Icons.route;
+      case POICategory.fuel:
+        return Icons.local_gas_station;
+      case POICategory.service:
+        return Icons.build;
+      case POICategory.accommodation:
+        return Icons.hotel;
+      case POICategory.restaurant:
+        return Icons.restaurant;
     }
   }
 }

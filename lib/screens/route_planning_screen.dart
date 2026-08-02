@@ -10,6 +10,7 @@ import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
 import '../services/geocoding_service.dart';
+import '../widgets/section_header.dart';
 import 'navigation_screen.dart';
 
 class RoutePlanningScreen extends StatefulWidget {
@@ -56,98 +57,116 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           });
         }
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Planowanie trasy'),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                tooltip: 'Adres domowy',
-                icon: const Icon(Icons.home_outlined),
-                onPressed: _showHomeSheet,
+          body: Column(
+            children: [
+              SectionHeader(
+                title: 'Planowanie trasy',
+                icon: Icons.route,
+                actions: [
+                  IconButton(
+                    tooltip: 'Adres domowy',
+                    icon: const Icon(Icons.home_outlined),
+                    color: Colors.white,
+                    onPressed: _showHomeSheet,
+                  ),
+                  TextButton.icon(
+                    onPressed: () => routeVM.useCurrentLocation(),
+                    icon: const Icon(Icons.gps_fixed, size: 18),
+                    label: const Text('GPS'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  ),
+                ],
               ),
-              TextButton.icon(
-                onPressed: () => routeVM.useCurrentLocation(),
-                icon: const Icon(Icons.gps_fixed, size: 18),
-                label: const Text('GPS'),
-              ),
-            ],
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildLocationField(
-                  controller: _startController,
-                  icon: Icons.motorcycle,
-                  color: Colors.green,
-                  hint: 'Wpisz miejsce startu...',
-                  results: _startResults,
-                  onSelected: (loc) {
-                    _startController.text = loc.displayName;
-                    routeVM.setStartLocation(LatLng(loc.lat, loc.lon));
-                    _startResults = [];
-                  },
-                  onChanged: (q) => _searchLocation(q, (r) => _startResults = r),
-                ),
-                const SizedBox(height: 12),
-                _buildLocationField(
-                  controller: _endController,
-                  icon: Icons.flag,
-                  color: Colors.red,
-                  hint: 'Wpisz miejsce docelowe...',
-                  results: _endResults,
-                  onSelected: (loc) {
-                    _endController.text = loc.displayName;
-                    routeVM.setEndLocation(LatLng(loc.lat, loc.lon));
-                    _endResults = [];
-                  },
-                  onChanged: (q) => _searchLocation(q, (r) => _endResults = r),
-                ),
-                const SizedBox(height: 24),
-                _buildOptions(routeVM),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: (routeVM.startLocation != null && routeVM.endLocation != null)
-                      ? () {
-                          setState(() => _navigateOnReady = true);
-                          routeVM.planRoute(routeVM.startLocation!, routeVM.endLocation!);
-                        }
-                      : null,
-                  icon: const Icon(Icons.route),
-                  label: const Text('Wyznacz trasę'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildLocationField(
+                        controller: _startController,
+                        icon: Icons.motorcycle,
+                        color: Colors.green,
+                        hint: 'Wpisz miejsce startu...',
+                        results: _startResults,
+                        onSelected: (loc) {
+                          _startController.text = loc.displayName;
+                          routeVM.setStartLocation(LatLng(loc.lat, loc.lon));
+                          _startResults = [];
+                        },
+                        onChanged: (q) =>
+                            _searchLocation(q, (r) => _startResults = r),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildLocationField(
+                        controller: _endController,
+                        icon: Icons.flag,
+                        color: Colors.red,
+                        hint: 'Wpisz miejsce docelowe...',
+                        results: _endResults,
+                        onSelected: (loc) {
+                          _endController.text = loc.displayName;
+                          routeVM.setEndLocation(LatLng(loc.lat, loc.lon));
+                          _endResults = [];
+                        },
+                        onChanged: (q) =>
+                            _searchLocation(q, (r) => _endResults = r),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildOptions(routeVM),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: (routeVM.startLocation != null &&
+                                routeVM.endLocation != null)
+                            ? () {
+                                setState(() => _navigateOnReady = true);
+                                routeVM.planRoute(routeVM.startLocation!,
+                                    routeVM.endLocation!);
+                              }
+                            : null,
+                        icon: const Icon(Icons.route),
+                        label: const Text('Wyznacz trasę'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                      if (routeVM.isLoading) ...[
+                        const SizedBox(height: 16),
+                        const Center(child: CircularProgressIndicator()),
+                      ],
+                      if (routeVM.errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Text(routeVM.errorMessage!,
+                            style: const TextStyle(color: Colors.red)),
+                      ],
+                      if (routeVM.currentRoute != null) ...[
+                        const SizedBox(height: 24),
+                        _buildConfirmation(routeVM),
+                        if (routeVM.intermediateWaypoints.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: routeVM.intermediateWaypoints
+                                .map((w) => InputChip(
+                                      label: const Text('Punkt pośredni',
+                                          style: TextStyle(fontSize: 12)),
+                                      onDeleted: () =>
+                                          routeVM.removeWaypoint(w),
+                                      deleteIconColor: Colors.red,
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        SizedBox(
+                            height: 380, child: _buildPOIPanel(routeVM, poiVM)),
+                      ],
+                    ],
                   ),
                 ),
-                if (routeVM.isLoading) ...[
-                  const SizedBox(height: 16),
-                  const Center(child: CircularProgressIndicator()),
-                ],
-                if (routeVM.errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Text(routeVM.errorMessage!, style: const TextStyle(color: Colors.red)),
-                ],
-                if (routeVM.currentRoute != null) ...[
-                  const SizedBox(height: 24),
-                  _buildConfirmation(routeVM),
-                  if (routeVM.intermediateWaypoints.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: routeVM.intermediateWaypoints.map((w) => InputChip(
-                        label: const Text('Punkt pośredni', style: TextStyle(fontSize: 12)),
-                        onDeleted: () => routeVM.removeWaypoint(w),
-                        deleteIconColor: Colors.red,
-                      )).toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  SizedBox(height: 380, child: _buildPOIPanel(routeVM, poiVM)),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -170,7 +189,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 8),
-            Text(hint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(hint,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         const SizedBox(height: 4),
@@ -181,7 +201,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
             border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: const Icon(Icons.clear),
-              onPressed: () { controller.clear(); onChanged(''); },
+              onPressed: () {
+                controller.clear();
+                onChanged('');
+              },
             ),
           ),
           onChanged: (q) => _onSearchChanged(controller, q),
@@ -198,9 +221,11 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               itemCount: results.length,
               itemBuilder: (_, i) => ListTile(
                 dense: true,
-                title: Text(results[i].displayName, style: const TextStyle(fontSize: 13)),
-                subtitle: Text('${results[i].lat.toStringAsFixed(4)}, ${results[i].lon.toStringAsFixed(4)}',
-                  style: const TextStyle(fontSize: 11)),
+                title: Text(results[i].displayName,
+                    style: const TextStyle(fontSize: 13)),
+                subtitle: Text(
+                    '${results[i].lat.toStringAsFixed(4)}, ${results[i].lon.toStringAsFixed(4)}',
+                    style: const TextStyle(fontSize: 11)),
                 onTap: () => onSelected(results[i]),
               ),
             ),
@@ -216,25 +241,35 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Preferencje trasy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Preferencje trasy',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('Unikaj autostrad'),
               subtitle: const Text('Bardziej malownicze drogi'),
               value: routeVM.routeOptions.avoidHighways,
-              onChanged: (v) { routeVM.routeOptions.avoidHighways = v; routeVM.setRouteOptions(routeVM.routeOptions); },
+              onChanged: (v) {
+                routeVM.routeOptions.avoidHighways = v;
+                routeVM.setRouteOptions(routeVM.routeOptions);
+              },
             ),
             SwitchListTile(
               title: const Text('Preferuj kręte drogi'),
               subtitle: const Text('Więcej zakrętów = więcej frajdy'),
               value: routeVM.routeOptions.preferCurvyRoads,
-              onChanged: (v) { routeVM.routeOptions.preferCurvyRoads = v; routeVM.setRouteOptions(routeVM.routeOptions); },
+              onChanged: (v) {
+                routeVM.routeOptions.preferCurvyRoads = v;
+                routeVM.setRouteOptions(routeVM.routeOptions);
+              },
             ),
             SwitchListTile(
               title: const Text('Dodaj malownicze objazdy'),
               subtitle: const Text('Odwiedź ciekawe miejsca po drodze'),
               value: routeVM.routeOptions.includeScenicDetours,
-              onChanged: (v) { routeVM.routeOptions.includeScenicDetours = v; routeVM.setRouteOptions(routeVM.routeOptions); },
+              onChanged: (v) {
+                routeVM.routeOptions.includeScenicDetours = v;
+                routeVM.setRouteOptions(routeVM.routeOptions);
+              },
             ),
           ],
         ),
@@ -254,17 +289,21 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.green, size: 22),
                 const SizedBox(width: 8),
-                const Text('Trasa wyznaczona!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Trasa wyznaczona!',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 4),
-            Text(route.name, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(route.name,
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    onPressed: () =>
+                        Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => NavigationScreen(route: route),
                     )),
                     icon: const Icon(Icons.navigation, size: 18),
@@ -294,7 +333,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               onPressed: () => _saveRoute(context, routeVM, route),
               icon: const Icon(Icons.bookmark),
               label: const Text('Zapisz trasę'),
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+              style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ],
         ),
@@ -302,12 +342,15 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     );
   }
 
-  void _saveRoute(BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
+  void _saveRoute(
+      BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
     final already = routeVM.savedRoutes.any((r) => r.id == route.id);
     if (!already) routeVM.saveRoute(route);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(already ? 'Trasa jest już w Zapisane' : 'Trasa zapisana w Zapisane'),
+        content: Text(already
+            ? 'Trasa jest już w Zapisane'
+            : 'Trasa zapisana w Zapisane'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -327,7 +370,9 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 const Icon(Icons.attractions, color: Colors.orange, size: 18),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('Dla motocyklisty (10 km)', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  child: Text('Dla motocyklisty (10 km)',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold)),
                 ),
                 if (poiVM.isLoading)
                   const SizedBox(
@@ -348,11 +393,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.cloud_off, color: Colors.grey, size: 28),
+                              const Icon(Icons.cloud_off,
+                                  color: Colors.grey, size: 28),
                               const SizedBox(height: 6),
                               Text(
                                 'Nie udało się pobrać miejsc.\nSpróbuj ponownie później.',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                                 textAlign: TextAlign.center,
                               ),
                             ],
@@ -365,15 +412,18 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                               padding: const EdgeInsets.all(12),
                               child: Text(
                                 'Brak miejsc w promieniu 10 km od trasy',
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.grey),
                                 textAlign: TextAlign.center,
                               ),
                             ),
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             itemCount: pois.take(15).length,
-                            itemBuilder: (_, i) => _buildPOITile(routeVM, pois[i]),
+                            itemBuilder: (_, i) =>
+                                _buildPOITile(routeVM, pois[i]),
                           ),
           ),
         ],
@@ -394,14 +444,19 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           backgroundColor: Colors.orange.withValues(alpha: 0.2),
           child: Icon(_poiIcon(poi.category), color: Colors.orange, size: 18),
         ),
-        title: Text(poi.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(poi.category.label, style: const TextStyle(fontSize: 11)),
+        title: Text(poi.name,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        subtitle:
+            Text(poi.category.label, style: const TextStyle(fontSize: 11)),
         trailing: IconButton(
           tooltip: added ? 'Usuń z trasy' : 'Dodaj jako punkt trasy',
           icon: Icon(added ? Icons.remove_circle : Icons.add_circle,
-            color: added ? Colors.green : Colors.orange),
-          onPressed: () => added ? routeVM.removeWaypoint(poi.coordinate) : routeVM.addWaypoint(poi.coordinate),
+              color: added ? Colors.green : Colors.orange),
+          onPressed: () => added
+              ? routeVM.removeWaypoint(poi.coordinate)
+              : routeVM.addWaypoint(poi.coordinate),
         ),
       ),
     );
@@ -429,8 +484,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     final seq = ++_searchSequence;
     if (query.length < 3) {
       setState(() {
-        if (controller == _startController) _startResults = [];
-        else _endResults = [];
+        if (controller == _startController)
+          _startResults = [];
+        else
+          _endResults = [];
       });
       return;
     }
@@ -438,27 +495,37 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       _searchLocation(query, (r) {
         if (seq != _searchSequence || !mounted) return;
         setState(() {
-          if (controller == _startController) _startResults = r;
-          else _endResults = r;
+          if (controller == _startController)
+            _startResults = r;
+          else
+            _endResults = r;
         });
       });
     });
   }
 
-  void _searchLocation(String query, Function(List<GeocodingResult>) onResult) async {
+  void _searchLocation(
+      String query, Function(List<GeocodingResult>) onResult) async {
     final results = await GeocodingService.shared.search(query);
     if (mounted) onResult(results);
   }
 
   IconData _poiIcon(POICategory category) {
     switch (category) {
-      case POICategory.viewpoint: return Icons.visibility;
-      case POICategory.mountainPass: return Icons.terrain;
-      case POICategory.scenicRoad: return Icons.route;
-      case POICategory.fuel: return Icons.local_gas_station;
-      case POICategory.service: return Icons.build;
-      case POICategory.accommodation: return Icons.hotel;
-      case POICategory.restaurant: return Icons.restaurant;
+      case POICategory.viewpoint:
+        return Icons.visibility;
+      case POICategory.mountainPass:
+        return Icons.terrain;
+      case POICategory.scenicRoad:
+        return Icons.route;
+      case POICategory.fuel:
+        return Icons.local_gas_station;
+      case POICategory.service:
+        return Icons.build;
+      case POICategory.accommodation:
+        return Icons.hotel;
+      case POICategory.restaurant:
+        return Icons.restaurant;
     }
   }
 }
@@ -489,32 +556,38 @@ class _HomeSheetState extends State<_HomeSheet> {
   Widget build(BuildContext context) {
     final home = widget.settings.home;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Adres domowy', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('Adres domowy',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             const Text('Użyj adresu domowego jako punktu startu.',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
             if (home != null) ...[
               const SizedBox(height: 12),
               Card(
                 color: Colors.orange.shade50,
                 margin: EdgeInsets.zero,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.home, color: Colors.deepOrange, size: 20),
+                      const Icon(Icons.home,
+                          color: Colors.deepOrange, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(home.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 13),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis),
                       ),
                       IconButton(
                         tooltip: 'Użyj jako start',
@@ -523,7 +596,8 @@ class _HomeSheetState extends State<_HomeSheet> {
                       ),
                       IconButton(
                         tooltip: 'Usuń',
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
                         onPressed: () => widget.settings.clearHome(),
                       ),
                     ],
@@ -554,7 +628,8 @@ class _HomeSheetState extends State<_HomeSheet> {
                   itemCount: _results.length,
                   itemBuilder: (_, i) => ListTile(
                     dense: true,
-                    title: Text(_results[i].displayName, style: const TextStyle(fontSize: 13)),
+                    title: Text(_results[i].displayName,
+                        style: const TextStyle(fontSize: 13)),
                     onTap: () {
                       final r = _results[i];
                       widget.settings.setHome(HomeAddress(

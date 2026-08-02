@@ -5,6 +5,7 @@ import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
 import '../widgets/offline_route_preview.dart';
+import '../widgets/section_header.dart';
 
 class SavedRoutesScreen extends StatelessWidget {
   const SavedRoutesScreen({super.key});
@@ -14,36 +15,48 @@ class SavedRoutesScreen extends StatelessWidget {
     return Consumer<RouteProvider>(
       builder: (context, routeVM, _) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Zapisane trasy'),
-            centerTitle: true,
+          body: Column(
+            children: [
+              const SectionHeader(
+                  title: 'Zapisane trasy', icon: Icons.bookmark),
+              Expanded(
+                child: routeVM.savedRoutes.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bookmark_border,
+                                size: 64, color: Colors.grey[600]),
+                            const SizedBox(height: 16),
+                            Text('Brak zapisanych tras',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            const Text(
+                                'Zaplanuj i zapisz trasę, aby ją tutaj zobaczyć',
+                                style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: routeVM.savedRoutes.length,
+                        itemBuilder: (_, i) => _buildRouteCard(
+                            context, routeVM, routeVM.savedRoutes[i]),
+                      ),
+              ),
+            ],
           ),
-          body: routeVM.savedRoutes.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.bookmark_border, size: 64, color: Colors.grey[600]),
-                      const SizedBox(height: 16),
-                      Text('Brak zapisanych tras', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      const Text('Zaplanuj i zapisz trasę, aby ją tutaj zobaczyć',
-                        style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: routeVM.savedRoutes.length,
-                  itemBuilder: (_, i) => _buildRouteCard(context, routeVM, routeVM.savedRoutes[i]),
-                ),
         );
       },
     );
   }
 
-  Widget _buildRouteCard(BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
-    final scenicColor = route.scenicScore >= 60 ? Colors.green
-        : route.scenicScore >= 30 ? Colors.orange : Colors.grey;
+  Widget _buildRouteCard(
+      BuildContext context, RouteProvider routeVM, MotorcycleRoute route) {
+    final scenicColor = route.scenicScore >= 60
+        ? Colors.green
+        : route.scenicScore >= 30
+            ? Colors.orange
+            : Colors.grey;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -57,7 +70,8 @@ class SavedRoutesScreen extends StatelessWidget {
           ),
           child: Icon(Icons.route, color: scenicColor),
         ),
-        title: Text(route.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(route.name,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -65,24 +79,29 @@ class SavedRoutesScreen extends StatelessWidget {
               children: [
                 const Icon(Icons.straighten, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(_formatDistance(route.totalDistance), style: const TextStyle(fontSize: 12)),
+                Text(_formatDistance(route.totalDistance),
+                    style: const TextStyle(fontSize: 12)),
                 const SizedBox(width: 12),
                 const Icon(Icons.schedule, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(_formatDuration(route.estimatedDuration), style: const TextStyle(fontSize: 12)),
+                Text(_formatDuration(route.estimatedDuration),
+                    style: const TextStyle(fontSize: 12)),
               ],
             ),
             Row(
               children: [
                 const Icon(Icons.star, size: 14, color: Colors.yellow),
                 const SizedBox(width: 4),
-                Text('${route.scenicScore}/100', style: const TextStyle(fontSize: 12)),
+                Text('${route.scenicScore}/100',
+                    style: const TextStyle(fontSize: 12)),
                 if (route.roadTypes.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(route.roadTypes.map((t) => t.label).join(', '),
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ],
@@ -90,9 +109,11 @@ class SavedRoutesScreen extends StatelessWidget {
           ],
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => _RouteDetailScreen(route: route),
-        )),
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => _RouteDetailScreen(route: route),
+            )),
       ),
     );
   }
@@ -147,7 +168,8 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                       top: 4,
                       right: 4,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(10),
@@ -155,10 +177,14 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.cloud_off, size: 14, color: Colors.white),
+                            Icon(Icons.cloud_off,
+                                size: 14, color: Colors.white),
                             SizedBox(width: 4),
                             Text('Dostępne offline',
-                              style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -175,24 +201,35 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Szczegóły trasy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text('Szczegóły trasy',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          _statBox(Icons.straighten, _formatDistance(widget.route.totalDistance), 'Dystans'),
+                          _statBox(
+                              Icons.straighten,
+                              _formatDistance(widget.route.totalDistance),
+                              'Dystans'),
                           const SizedBox(width: 8),
-                          _statBox(Icons.schedule, _formatDuration(widget.route.estimatedDuration), 'Czas'),
+                          _statBox(
+                              Icons.schedule,
+                              _formatDuration(widget.route.estimatedDuration),
+                              'Czas'),
                           const SizedBox(width: 8),
-                          _statBox(Icons.star, '${widget.route.scenicScore}', 'Malowniczość'),
+                          _statBox(Icons.star, '${widget.route.scenicScore}',
+                              'Malowniczość'),
                         ],
                       ),
                       if (widget.route.roadTypes.isNotEmpty) ...[
                         const SizedBox(height: 12),
-                        const Text('Rodzaje dróg:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        const Text('Rodzaje dróg:',
+                            style: TextStyle(fontSize: 12, color: Colors.grey)),
                         ...widget.route.roadTypes.map((t) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(t.label, style: const TextStyle(fontSize: 12)),
-                        )),
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(t.label,
+                                  style: const TextStyle(fontSize: 12)),
+                            )),
                       ],
                     ],
                   ),
@@ -208,27 +245,37 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Pogoda na trasie', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const Text('Pogoda na trasie',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         SizedBox(
                           height: 60,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
-                            children: weatherVM.weatherPoints.map((wp) => Container(
-                              width: 50,
-                              margin: const EdgeInsets.only(right: 4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.wb_sunny, size: 16, color: Colors.yellow),
-                                  Text('${wp.temperature.toInt()}°', style: const TextStyle(fontSize: 10)),
-                                ],
-                              ),
-                            )).toList(),
+                            children: weatherVM.weatherPoints
+                                .map((wp) => Container(
+                                      width: 50,
+                                      margin: const EdgeInsets.only(right: 4),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.wb_sunny,
+                                              size: 16, color: Colors.yellow),
+                                          Text('${wp.temperature.toInt()}°',
+                                              style: const TextStyle(
+                                                  fontSize: 10)),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
                           ),
                         ),
                       ],
@@ -245,20 +292,26 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Miejsca do odwiedzenia', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const Text('Miejsca do odwiedzenia',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         ...poiVM.pointsOfInterest.take(5).map((poi) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.pin_drop, size: 16, color: Colors.orange),
-                              const SizedBox(width: 8),
-                              Text(poi.name, style: const TextStyle(fontSize: 13)),
-                              const Spacer(),
-                              Text(poi.category.label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                        )),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.pin_drop,
+                                      size: 16, color: Colors.orange),
+                                  const SizedBox(width: 8),
+                                  Text(poi.name,
+                                      style: const TextStyle(fontSize: 13)),
+                                  const Spacer(),
+                                  Text(poi.category.label,
+                                      style: const TextStyle(
+                                          fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                            )),
                       ],
                     ),
                   ),
@@ -282,8 +335,11 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
           children: [
             Icon(icon, color: Colors.orange, size: 20),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            Text(value,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(label,
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
           ],
         ),
       ),
