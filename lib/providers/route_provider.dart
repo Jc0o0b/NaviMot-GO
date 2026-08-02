@@ -53,6 +53,13 @@ class RouteProvider extends ChangeNotifier {
     _replan();
   }
 
+  void setWaypointOrder(List<LatLng> waypoints) {
+    _intermediateWaypoints
+      ..clear()
+      ..addAll(waypoints);
+    _replan();
+  }
+
   void _replan() {
     notifyListeners();
     final start = _startLocation;

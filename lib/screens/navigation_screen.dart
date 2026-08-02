@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
+import '../models/traffic_regulations.dart';
 import '../services/location_service.dart';
 import '../services/navigation_service.dart';
 import '../widgets/road_view_2d.dart';
@@ -56,6 +57,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
         : widget.route.totalDistance;
     _stepCumulative = _computeStepCumulative(widget.route.steps);
     _nextStepIndex = _nextMeaningfulStepIndex();
+    _remainingDistance = _totalDistance;
+    _remainingDuration = PolishTrafficRegulations.shared
+        .calculateTravelTime(
+            widget.route.totalDistance, widget.route.roadTypes)
+        .drivingTime;
     _initTts();
     _startTracking();
   }
@@ -197,6 +203,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final steps = widget.route.steps;
     if (steps.isEmpty) {
       _remainingDistance = max(0, _totalDistance - _distanceAlong(loc));
+      final totalTravel = PolishTrafficRegulations.shared
+          .calculateTravelTime(widget.route.totalDistance,
+              widget.route.roadTypes)
+          .drivingTime;
+      _remainingDuration =
+          _totalDistance > 0 ? totalTravel * (_remainingDistance / _totalDistance) : 0;
       return;
     }
     final along = _distanceAlong(loc);

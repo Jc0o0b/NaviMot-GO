@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/point_of_interest.dart';
 import '../models/route.dart';
+import '../models/traffic_regulations.dart';
 import '../models/weather_point.dart';
 import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
@@ -131,6 +132,7 @@ class _MapScreenState extends State<MapScreen>
                     _buildMarker(route.waypoints.last, Icons.flag, Colors.red),
                 ],
               ),
+              const RepaintBoundary(child: _WaypointMarkersLayer()),
             ],
             const RepaintBoundary(child: _WeatherMarkersLayer()),
             RepaintBoundary(child: _POIMarkersLayer(visible: _poisShownOnMap)),
@@ -396,6 +398,37 @@ class _EventMarkersLayer extends StatelessWidget {
     ];
     if (markers.isEmpty) return const SizedBox.shrink();
     return MarkerLayer(markers: markers);
+  }
+}
+
+class _WaypointMarkersLayer extends StatelessWidget {
+  const _WaypointMarkersLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    final waypoints = context.watch<RouteProvider>().intermediateWaypoints;
+    if (waypoints.isEmpty) return const SizedBox.shrink();
+    return MarkerLayer(
+      markers: [
+        for (final wp in waypoints)
+          Marker(
+            point: wp,
+            width: 36,
+            height: 36,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue, width: 2),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black45, blurRadius: 5),
+                ],
+              ),
+              child: const Icon(Icons.place, color: Colors.blue, size: 24),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -817,6 +850,8 @@ class _AlternativeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fastest = route.label == 'Najszybsza';
+    final travel = PolishTrafficRegulations.shared
+        .calculateTravelTime(route.totalDistance, route.roadTypes);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -855,7 +890,7 @@ class _AlternativeTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${_formatDuration(route.estimatedDuration)} · ${_formatDistance(route.totalDistance)}',
+                    '${_formatDuration(travel.drivingTime)} · ${_formatDistance(route.totalDistance)}',
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ],

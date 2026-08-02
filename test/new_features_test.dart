@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:navimot_go/models/road_event.dart';
 import 'package:navimot_go/models/route.dart';
 import 'package:navimot_go/models/route_step.dart';
+import 'package:navimot_go/models/traffic_regulations.dart';
 import 'package:navimot_go/providers/chat_provider.dart';
 import 'package:navimot_go/providers/events_provider.dart';
 import 'package:navimot_go/providers/route_provider.dart';
@@ -113,6 +114,42 @@ void main() {
     provider.removeWaypoint(const LatLng(52.15, 21.05));
     expect(provider.intermediateWaypoints.length, 1);
     expect(provider.intermediateWaypoints.single.latitude, 52.2);
+  });
+
+  test('RouteProvider.setWaypointOrder zmienia kolejność przystanków', () {
+    SharedPreferences.setMockInitialValues({});
+    final provider = RouteProvider();
+    provider.addWaypoint(const LatLng(52.1, 21.0));
+    provider.addWaypoint(const LatLng(52.2, 21.1));
+    provider.addWaypoint(const LatLng(52.3, 21.2));
+
+    provider.setWaypointOrder([
+      const LatLng(52.3, 21.2),
+      const LatLng(52.1, 21.0),
+      const LatLng(52.2, 21.1),
+    ]);
+
+    expect(provider.intermediateWaypoints[0].latitude, 52.3);
+    expect(provider.intermediateWaypoints[1].latitude, 52.1);
+    expect(provider.intermediateWaypoints[2].latitude, 52.2);
+  });
+
+  test('Czas przejazdu malowniczej trasy liczony jak motocyklowy, nie rowerowy',
+      () {
+    final scenic = MotorcycleRoute(
+      id: 'scenic',
+      waypoints: const [LatLng(52.1, 21.0), LatLng(52.2, 21.1)],
+      name: 'Malownicza',
+      totalDistance: 200000,
+      estimatedDuration: 7 * 3600,
+      scenicScore: 80,
+      roadTypes: const [RoadType.scenic, RoadType.regional],
+      label: 'Malownicza',
+    );
+    final travel = PolishTrafficRegulations.shared.calculateTravelTime(
+        scenic.totalDistance, scenic.roadTypes);
+    expect(travel.drivingTime, lessThan(7 * 3600));
+    expect(travel.drivingTime, greaterThan(0));
   });
 
   test('RouteProvider.selectRoute ustawia trasę i czas przejazdu', () {

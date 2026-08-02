@@ -132,41 +132,20 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                               _searchLocation(q, (r) => _waypointResults = r),
                         )
                       else
-                        OutlinedButton.icon(
+                        FilledButton.icon(
                           onPressed: () =>
                               setState(() => _addingWaypoint = true),
-                          icon: const Icon(Icons.add_location_alt_outlined),
+                          icon: const Icon(Icons.add),
                           label: const Text('Dodaj przystanek na trasie'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blue,
-                            side: BorderSide(
-                                color: Colors.blue.withValues(alpha: 0.5)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       if (routeVM.intermediateWaypoints.isNotEmpty) ...[
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            for (var i = 0;
-                                i < routeVM.intermediateWaypoints.length;
-                                i++)
-                              InputChip(
-                                avatar: const Icon(Icons.place,
-                                    size: 16, color: Colors.blue),
-                                label: Text(
-                                  _waypointLabel(
-                                      routeVM.intermediateWaypoints[i], i),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                onDeleted: () => routeVM.removeWaypoint(
-                                    routeVM.intermediateWaypoints[i]),
-                                deleteIconColor: Colors.red,
-                              ),
-                          ],
-                        ),
+                        _buildStopList(routeVM),
                       ],
                       const SizedBox(height: 24),
                       _buildOptions(routeVM),
@@ -472,14 +451,138 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     });
   }
 
-  String _waypointLabel(LatLng w, int index) {
-    return 'Przystanek ${index + 1} · ${w.latitude.toStringAsFixed(3)}, '
-        '${w.longitude.toStringAsFixed(3)}';
+  Widget _buildStopList(RouteProvider routeVM) {
+    final waypoints = routeVM.intermediateWaypoints;
+    final items = <Object>[...waypoints, const _DestinationStop()];
+    final start = routeVM.startLocation;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            _StopTile(
+              icon: Icons.motorcycle,
+              color: Colors.green,
+              title: 'Start',
+              subtitle: start == null
+                  ? null
+                  : '${start.latitude.toStringAsFixed(4)}, '
+                      '${start.longitude.toStringAsFixed(4)}',
+            ),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: items.length,
+              onReorderItem: (oldIndex, newIndex) {
+                final updated = List<Object>.from(items);
+                final moved = updated.removeAt(oldIndex);
+                updated.insert(newIndex, moved);
+                routeVM.setWaypointOrder(
+                    updated.whereType<LatLng>().toList());
+              },
+              itemBuilder: (context, index) {
+                final item = items[index];
+                if (item is _DestinationStop) {
+                  return _StopTile(
+                    key: const ValueKey('dest'),
+                    index: index,
+                    icon: Icons.flag,
+                    color: Colors.red,
+                    title: 'Miejsce docelowe',
+                    draggable: true,
+                  );
+                }
+                final wp = item as LatLng;
+                return _StopTile(
+                  key: ValueKey(
+                      'wp-${wp.latitude},${wp.longitude}'),
+                  index: index,
+                  icon: Icons.place,
+                  color: Colors.blue,
+                  title: 'Przystanek ${waypoints.indexOf(wp) + 1}',
+                  subtitle: '${wp.latitude.toStringAsFixed(4)}, '
+                      '${wp.longitude.toStringAsFixed(4)}',
+                  draggable: true,
+                  onDelete: () => routeVM.removeWaypoint(wp),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _searchLocation(
       String query, Function(List<GeocodingResult>) onResult) async {
     final results = await GeocodingService.shared.search(query);
     if (mounted) onResult(results);
+  }
+}
+
+class _DestinationStop {
+  const _DestinationStop();
+}
+
+class _StopTile extends StatelessWidget {
+  final int? index;
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? subtitle;
+  final bool draggable;
+  final VoidCallback? onDelete;
+
+  const _StopTile({
+    super.key,
+    this.index,
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.subtitle,
+    this.draggable = false,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      dense: true,
+      leading: CircleAvatar(
+        radius: 14,
+        backgroundColor: color.withValues(alpha: 0.15),
+        child: Icon(icon, color: color, size: 18),
+      ),
+      title: Text(title,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: subtitle != null
+          ? Text(subtitle!,
+              style: const TextStyle(fontSize: 11, color: Colors.grey))
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.close, size: 18, color: Colors.red),
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Usuń przystanek',
+              onPressed: onDelete,
+            ),
+          if (draggable && index != null)
+            ReorderableDragStartListener(
+              index: index!,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.drag_handle, color: Colors.grey),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
