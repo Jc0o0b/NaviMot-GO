@@ -16,7 +16,7 @@ class AppColors {
 }
 
 class AppStrings {
-  static const String appName = 'Trasy Motocyklowe';
+  static const String appName = 'NaviMot GO';
   static const String startPoint = 'Punkt startowy';
   static const String endPoint = 'Punkt docelowy';
   static const String planRoute = 'Wyznacz trasę';

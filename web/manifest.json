@@ -1,0 +1,17 @@
+{
+  "name": "NaviMot GO - nawigacja i trasy dla motocyklistów",
+  "short_name": "NaviMot GO",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF5722",
+  "description": "Planowanie malowniczych tras motocyklowych, nawigacja, pogoda i miejsca dla motocyklisty.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

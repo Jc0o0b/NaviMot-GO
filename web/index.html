@@ -4,10 +4,80 @@
     <base href="/">
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
-    <title>Trasy Motocyklowe</title>
+    <meta name="theme-color" content="#FF5722">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="NaviMot GO">
+    <meta name="description" content="NaviMot GO - nawigacja i malownicze trasy motocyklowe z pogodą i miejscami dla motocyklisty.">
+    <title>NaviMot GO</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, #ffffff 0%, #ffe0b2 100%);
+        z-index: 9999;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #app-splash svg {
+        width: 132px;
+        height: 132px;
+        animation: rev 1.1s ease-in-out infinite alternate;
+      }
+      .brand {
+        margin-top: 18px;
+        font-size: 26px;
+        font-weight: 900;
+        color: #263238;
+        letter-spacing: 1px;
+        opacity: 0;
+        animation: fadeIn 0.7s ease-out 0.4s forwards;
+      }
+      .brand span { color: #FF5722; }
+      @keyframes rev {
+        from { transform: scale(0.94) rotate(-2deg); }
+        to { transform: scale(1.05) rotate(2deg); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash svg { animation: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="app-splash">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NaviMot GO">
+        <g stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="46" x2="28" y2="46" stroke="#FF5722" stroke-width="4" opacity="0.55"/>
+          <line x1="4" y1="56" x2="34" y2="56" stroke="#FF5722" stroke-width="4" opacity="0.55"/>
+          <line x1="6" y1="66" x2="28" y2="66" stroke="#FF5722" stroke-width="4" opacity="0.55"/>
+          <circle cx="26" cy="74" r="14" fill="#37474F"/>
+          <circle cx="74" cy="74" r="14" fill="#37474F"/>
+          <circle cx="26" cy="74" r="7.5" fill="#ECEFF1"/>
+          <circle cx="74" cy="74" r="7.5" fill="#ECEFF1"/>
+          <circle cx="26" cy="74" r="2" fill="#FF5722"/>
+          <circle cx="74" cy="74" r="2" fill="#FF5722"/>
+          <path d="M26 74 L33 50 L45 48 L58 42 L63 48 L74 74" fill="none" stroke="#263238" stroke-width="5"/>
+          <path d="M58 42 L68 38 L72 41" fill="none" stroke="#263238" stroke-width="5"/>
+          <circle cx="72" cy="41" r="2.5" fill="#FF5722"/>
+          <circle cx="69" cy="50" r="3" fill="#FF5722"/>
+          <rect x="34" y="56" width="16" height="11" rx="3" fill="#FF5722"/>
+          <path d="M34 60 L18 66" stroke="#455A64" stroke-width="4"/>
+          <circle cx="17" cy="67" r="3" fill="#455A64"/>
+          <ellipse cx="50" cy="84" rx="37" ry="4" fill="#808080" opacity="0.2"/>
+        </g>
+      </svg>
+      <div class="brand">NaviMot <span>GO</span></div>
+    </div>
     <script src="flutter.js" defer></script>
     <script src="flutter_bootstrap.js" async></script>
   </body>
