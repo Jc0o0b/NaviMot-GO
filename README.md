@@ -8,17 +8,22 @@ Aplikacja działa w przeglądarce (Flutter Web). Można ją też uruchomić loka
 
 - **Planowanie trasy** — wyznaczanie trasy motocyklowej (OSRM, profil rowerowy/scenic), punkty pośrednie
 - **Mapa** — podgląd trasy z animacją rysowania, znaczniki miejsc, panel podsumowania
+- **Przegląd offline** — zapisane trasy przeglądasz bez internetu (widok rysowany lokalnie, trasy trwają między uruchomieniami)
 - **Nawigacja** — widok 2D drogi z komunikatem głosowym (TTS) i obrotem wg kierunku jazdy
 - **Pogoda** — prognoza wzdłuż trasy (temperatura, wiatr, opady, warunki)
-- **Miejsca dla motocyklisty** — punkty widokowe, przełęcze górskie, malownicze drogi, stacje paliw, serwisy motocyklowe, noclegi i restauracje w promieniu 10 km od trasy (OpenStreetMap/Overpass)
+- **Miejsca dla motocyklisty** — punkty widokowe, przełęcze górskie, malownicze drogi, stacje paliw, serwisy motocyklowe, noclegi i restauracje w promieniu 10 km od trasy (OpenStreetMap/Overpass); z listy możesz pokazać wybrane miejsce na mapie
 - **Zapisywanie tras** — zapis ulubionych tras na urządzeniu
 - **Ocena malowniczości** — punktacja trasy na podstawie charakteru dróg
 
-## 🌐 Wersja testowa online
+## 🔗 Testuj online
 
-Aplikacja jest publicznie dostępna na GitHub Pages:
+Aplikacja działa w przeglądarce na **GitHub Pages** — kliknij i testuj bez instalowania czegokolwiek:
 
-**https://Jc0o0b.github.io/NaviMot-GO/**
+**👉 https://Jc0o0b.github.io/NaviMot-GO/**
+
+To zawsze najnowsza wersja z gałęzi `main`. Zgłaszaj uwagi i pomysły w zakładce **Issues**.
+
+> 💡 Jeśli otworzysz aplikację w telefonie przez przeglądarkę, działa ona również jako aplikacja (Add to Home Screen).
 
 ## 🛠 Technologie
 

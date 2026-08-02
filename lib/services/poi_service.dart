@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
@@ -10,95 +11,141 @@ class POIService {
   static POIService get shared => _instance;
   POIService._();
 
+  static bool get isWeb => identical(0, 0.0);
+
   static const List<String> _endpoints = [
-    'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://z.overpass-api.de/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
   ];
+  static const Duration _timeout = Duration(seconds: 30);
+  static const String _userAgent =
+      'NaviMot-GO/1.0 (+https://github.com/Jc0o0b/NaviMot-GO)';
+
   final http.Client _client = http.Client();
 
-  Future<List<PointOfInterest>> fetchPOIsAlongRoute(List<LatLng> waypoints, {double radius = 10000}) async {
+  Future<List<PointOfInterest>> fetchPOIsAlongRoute(
+    List<LatLng> waypoints, {
+    double radius = 10000,
+  }) async {
     if (waypoints.isEmpty) return [];
-    final samples = _samplePoints(waypoints, 4);
-    final query = _buildOverpassQuery(samples, radius: radius);
+    final samples = _samplePoints(waypoints, 3);
+    final query = _buildQuery(samples, radius: radius);
     final pois = await _fetchOverpass(query);
-    return _selectBest(pois, waypoints, markerCountForRoute(waypoints));
+    return _selectBest(pois, waypoints,
+        radius: radius, maxCount: markerCountForRoute(waypoints));
   }
 
-  Future<List<PointOfInterest>> fetchPOIsNearLocation(LatLng coordinate, {double radius = 10000, POICategory? category}) async {
-    final query = _buildOverpassQuery([coordinate], radius: radius, category: category);
+  Future<List<PointOfInterest>> fetchPOIsNearLocation(
+    LatLng coordinate, {
+    double radius = 10000,
+    POICategory? category,
+  }) async {
+    final query = _buildQuery([coordinate], radius: radius, category: category);
     return _fetchOverpass(query);
   }
 
   Future<List<PointOfInterest>> _fetchOverpass(String query) async {
-    Object? lastError;
+    final completer = Completer<List<PointOfInterest>>();
+    var failed = 0;
+    final total = _endpoints.length;
+
     for (final ep in _endpoints) {
-      try {
-        final response = await _client
-            .post(Uri.parse(ep), body: {'data': query})
-            .timeout(const Duration(seconds: 25));
-        if (response.statusCode != 200) continue;
-        final body = response.body.trim();
-        if (!body.startsWith('{') && !body.startsWith('[')) {
-          if (body.contains('Error')) lastError = Exception('Overpass: $ep');
-          continue;
+      _fetchOne(ep, query).then((pois) {
+        if (!completer.isCompleted) completer.complete(pois);
+      }).catchError((_) {
+        failed++;
+        if (!completer.isCompleted && failed >= total) {
+          completer.completeError(
+              Exception('wszystkie serwery Overpass są niedostępne'));
         }
-        final json = jsonDecode(body);
-        if (json is! Map<String, dynamic>) continue;
-        final elements = json['elements'] as List? ?? [];
-        return _parseElements(elements);
-      } catch (e) {
-        lastError = e;
-      }
+      });
     }
-    throw lastError ?? Exception('Overpass endpoints niedostępne');
+    return completer.future;
   }
 
-  String _buildOverpassQuery(List<LatLng> samples, {double radius = 10000, POICategory? category}) {
+  Future<List<PointOfInterest>> _fetchOne(String ep, String query) async {
+    final response = await _client
+        .post(
+          Uri.parse(ep),
+          headers: isWeb ? null : {'User-Agent': _userAgent},
+          body: {'data': query},
+        )
+        .timeout(_timeout);
+    if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
+    final body = response.body.trim();
+    if (!body.startsWith('{') && !body.startsWith('[')) {
+      throw Exception('odpowiedź nie jest JSON');
+    }
+    final json = jsonDecode(body);
+    if (json is! Map<String, dynamic>) throw Exception('nieoczekiwany format');
+    final elements = json['elements'] as List? ?? [];
+    return _parseElements(elements);
+  }
+
+  String _buildQuery(
+    List<LatLng> samples, {
+    double radius = 10000,
+    POICategory? category,
+  }) {
     final categories = category != null ? [category] : POICategory.values;
-    final filters = <String>{};
+    final statements = <String>[];
     for (final s in samples) {
-      final around = '(around:$radius,${s.latitude.toStringAsFixed(5)},${s.longitude.toStringAsFixed(5)});';
+      final bbox = _bboxFor(s, radius);
       for (final cat in categories) {
-        switch (cat) {
-          case POICategory.viewpoint:
-            filters.add('node["tourism"="viewpoint"]["name"]$around');
-            filters.add('way["tourism"="viewpoint"]["name"]$around');
-          case POICategory.mountainPass:
-            filters.add('node["mountain_pass"="yes"]["name"]$around');
-            filters.add('way["mountain_pass"="yes"]["name"]$around');
-            filters.add('node["natural"="mountain_pass"]["name"]$around');
-            filters.add('way["natural"="mountain_pass"]["name"]$around');
-          case POICategory.scenicRoad:
-            filters.add('way["tourism"="scenic_route"]["name"]$around');
-          case POICategory.fuel:
-            filters.add('node["amenity"="fuel"]["name"]$around');
-          case POICategory.service:
-            filters.add('node["shop"="motorcycle_repair"]["name"]$around');
-            filters.add('node["craft"="motorcycle_repair"]["name"]$around');
-            filters.add('way["shop"="motorcycle_repair"]["name"]$around');
-            filters.add('node["shop"="motorcycle"]["name"]$around');
-          case POICategory.accommodation:
-            filters.add('node["tourism"="hotel"]["name"]$around');
-            filters.add('node["tourism"="guest_house"]["name"]$around');
-            filters.add('node["tourism"="hostel"]["name"]$around');
-            filters.add('node["tourism"="motel"]["name"]$around');
-            filters.add('node["tourism"="camp_site"]["name"]$around');
-            filters.add('way["tourism"="hotel"]["name"]$around');
-          case POICategory.restaurant:
-            filters.add('node["amenity"="restaurant"]["name"]$around');
-            filters.add('node["amenity"="fast_food"]["name"]$around');
+        for (final filter in _filtersFor(cat)) {
+          statements.add('$filter$bbox;');
         }
       }
     }
-
     return '''
-[out:json][timeout:40];
+[out:json][timeout:30];
 (
-  ${filters.join('\n  ')}
+  ${statements.join('\n  ')}
 );
 out tags center qt;
 ''';
+  }
+
+  List<String> _filtersFor(POICategory cat) {
+    switch (cat) {
+      case POICategory.viewpoint:
+        return [
+          'node["tourism"="viewpoint"]["name"]',
+          'way["tourism"="viewpoint"]["name"]',
+        ];
+      case POICategory.mountainPass:
+        return [
+          'node["mountain_pass"="yes"]["name"]',
+          'node["natural"="mountain_pass"]["name"]',
+        ];
+      case POICategory.scenicRoad:
+        return ['way["tourism"="scenic_route"]["name"]'];
+      case POICategory.fuel:
+        return ['node["amenity"="fuel"]["name"]'];
+      case POICategory.service:
+        return [
+          'node["shop"~"motorcycle"]["name"]',
+          'node["craft"="motorcycle_repair"]["name"]',
+        ];
+      case POICategory.accommodation:
+        return ['node["tourism"~"^(hotel|guest_house|hostel|motel|camp_site)\$"]["name"]'];
+      case POICategory.restaurant:
+        return ['node["amenity"~"^(restaurant|fast_food)\$"]["name"]'];
+    }
+  }
+
+  String _bboxFor(LatLng p, double radius) {
+    final dLat = radius / 111320.0 * 1.1;
+    final cosLat = max(cos(p.latitude * pi / 180), 0.1);
+    final dLon = radius / (111320.0 * cosLat) * 1.1;
+    return '(${(p.latitude - dLat).toStringAsFixed(5)},'
+        '${(p.longitude - dLon).toStringAsFixed(5)},'
+        '${(p.latitude + dLat).toStringAsFixed(5)},'
+        '${(p.longitude + dLon).toStringAsFixed(5)})';
   }
 
   List<LatLng> _samplePoints(List<LatLng> waypoints, int count) {
@@ -111,15 +158,32 @@ out tags center qt;
     return sampled;
   }
 
-  List<PointOfInterest> _selectBest(List<PointOfInterest> pois, List<LatLng> waypoints, int maxCount) {
+  List<PointOfInterest> _selectBest(
+    List<PointOfInterest> pois,
+    List<LatLng> waypoints, {
+    required double radius,
+    required int maxCount,
+  }) {
     if (pois.isEmpty || maxCount <= 0) return pois;
     final scored = <({PointOfInterest poi, double along, double off})>[];
     for (final poi in pois) {
       final proj = _projectOntoRoute(poi.coordinate, waypoints);
+      if (proj.$2 > radius) continue;
       scored.add((poi: poi, along: proj.$1, off: proj.$2));
     }
-    scored.sort((a, b) => a.off.compareTo(b.off));
-    final candidates = scored.take(60).toList()..sort((a, b) => a.along.compareTo(b.along));
+    if (scored.isEmpty) return [];
+
+    final perCategoryCap = max(3, maxCount ~/ 2);
+    final byCategory = <POICategory, List<({PointOfInterest poi, double along, double off})>>{};
+    for (final s in scored) {
+      byCategory.putIfAbsent(s.poi.category, () => []).add(s);
+    }
+    final candidates = <({PointOfInterest poi, double along, double off})>[];
+    for (final list in byCategory.values) {
+      list.sort((a, b) => a.off.compareTo(b.off));
+      candidates.addAll(list.take(perCategoryCap));
+    }
+    candidates.sort((a, b) => a.along.compareTo(b.along));
     final n = candidates.length;
     if (n <= maxCount) return candidates.map((e) => e.poi).toList();
 
@@ -190,8 +254,8 @@ out tags center qt;
     if (tags['mountain_pass'] == 'yes' || tags['natural'] == 'mountain_pass') return POICategory.mountainPass;
     if (tags['tourism'] == 'scenic_route') return POICategory.scenicRoad;
     if (tags['amenity'] == 'fuel') return POICategory.fuel;
-    if (tags['shop'] == 'motorcycle_repair' || tags['craft'] == 'motorcycle_repair' || tags['shop'] == 'motorcycle') return POICategory.service;
-    if (tags['tourism'] == 'hotel' || tags['tourism'] == 'guest_house' || tags['tourism'] == 'hostel' || tags['tourism'] == 'motel' || tags['tourism'] == 'camp_site') return POICategory.accommodation;
+    if ((tags['shop'] ?? '').toString().contains('motorcycle') || tags['craft'] == 'motorcycle_repair') return POICategory.service;
+    if (const {'hotel', 'guest_house', 'hostel', 'motel', 'camp_site'}.contains(tags['tourism'])) return POICategory.accommodation;
     if (tags['amenity'] == 'restaurant' || tags['amenity'] == 'fast_food') return POICategory.restaurant;
     return POICategory.viewpoint;
   }

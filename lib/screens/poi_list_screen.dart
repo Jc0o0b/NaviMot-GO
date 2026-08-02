@@ -5,7 +5,9 @@ import '../providers/poi_provider.dart';
 import '../providers/route_provider.dart';
 
 class POIListScreen extends StatelessWidget {
-  const POIListScreen({super.key});
+  final VoidCallback? onShowOnMap;
+
+  const POIListScreen({super.key, this.onShowOnMap});
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +149,21 @@ class POIListScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(poi.description, style: const TextStyle(fontSize: 14, height: 1.4)),
-            const SizedBox(height: 24),
-            FilledButton(
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.read<POIProvider>().selectPOI(poi);
+                  onShowOnMap?.call();
+                },
+                icon: const Icon(Icons.map, size: 18),
+                label: const Text('Pokaż na mapie'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonal(
               onPressed: () => Navigator.pop(context),
               child: const Text('Zamknij'),
             ),

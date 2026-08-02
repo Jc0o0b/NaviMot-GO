@@ -19,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const MapScreen(),
     RoutePlanningScreen(onRoutePlanned: () => setState(() => _selectedIndex = 0)),
     const WeatherScreen(),
-    const POIListScreen(),
+    POIListScreen(onShowOnMap: () => setState(() => _selectedIndex = 0)),
     const SavedRoutesScreen(),
   ];
 

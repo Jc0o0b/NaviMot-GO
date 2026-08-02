@@ -24,6 +24,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   String? _fittedRouteId;
   String? _poisLoadedRouteId;
   bool _poisShownOnMap = false;
+  String? _focusedPoiId;
 
   late final AnimationController _drawCtrl;
   Animation<double>? _drawAnim;
@@ -55,6 +56,20 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         _fitRoute(r);
         _startRouteAnimation(r);
         _ensurePoisLoaded(r);
+      });
+    }
+
+    final selectedPoi = context.watch<POIProvider>().selectedPOI;
+    if (selectedPoi != null && selectedPoi.id != _focusedPoiId) {
+      _focusedPoiId = selectedPoi.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final s = context.read<POIProvider>().selectedPOI;
+        if (s == null) return;
+        setState(() => _poisShownOnMap = true);
+        try {
+          _mapController.move(s.coordinate, 13);
+        } catch (_) {}
       });
     }
 
@@ -127,6 +142,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   }
 
   void _handleMapTap(TapPosition tapPosition, LatLng point) {
+    context.read<POIProvider>().selectPOI(null);
     final route = context.read<RouteProvider>().currentRoute;
     if (route == null || route.waypoints.length < 2) return;
     final zoom = _mapController.camera.zoom;
@@ -255,15 +271,31 @@ class _POIMarkersLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final poiVM = context.watch<POIProvider>();
+    final selected = poiVM.selectedPOI;
     if (!visible || poiVM.pointsOfInterest.isEmpty) return const SizedBox.shrink();
-    return MarkerLayer(
-      markers: poiVM.pointsOfInterest.take(30).map((poi) => Marker(
-        point: poi.coordinate,
-        width: 34,
-        height: 34,
-        child: POIMarkerWidget(poi: poi),
-      )).toList(),
-    );
+    final markers = poiVM.pointsOfInterest.take(30).map((poi) => Marker(
+      point: poi.coordinate,
+      width: 34,
+      height: 34,
+      child: POIMarkerWidget(poi: poi),
+    )).toList();
+    if (selected != null) {
+      markers.add(Marker(
+        point: selected.coordinate,
+        width: 48,
+        height: 48,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.deepOrange, width: 3),
+            boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 6)],
+          ),
+          child: const Icon(Icons.place, color: Colors.deepOrange, size: 30),
+        ),
+      ));
+    }
+    return MarkerLayer(markers: markers);
   }
 }
 

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/route.dart';
 import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
+import '../widgets/offline_route_preview.dart';
 
 class SavedRoutesScreen extends StatelessWidget {
   const SavedRoutesScreen({super.key});
@@ -137,32 +136,34 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Map preview
+              // Offline preview (bez kafli mapy - działa bez internetu)
               SizedBox(
                 height: 200,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: _centerOf(widget.route.waypoints),
-                      initialZoom: 8,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    OfflineRoutePreview(route: widget.route),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.cloud_off, size: 14, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('Dostępne offline',
+                              style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.motorcycle.routes',
-                      ),
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: widget.route.waypoints,
-                            color: Colors.orange,
-                            strokeWidth: 4,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -287,12 +288,6 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
         ),
       ),
     );
-  }
-
-  LatLng _centerOf(List<LatLng> points) {
-    double lat = 0, lon = 0;
-    for (final p in points) { lat += p.latitude; lon += p.longitude; }
-    return LatLng(lat / points.length, lon / points.length);
   }
 
   String _formatDistance(double meters) {

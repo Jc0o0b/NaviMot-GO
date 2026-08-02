@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/route.dart';
 import '../models/route_options.dart';
 import '../models/traffic_regulations.dart';
@@ -8,6 +10,8 @@ import '../services/location_service.dart';
 import '../utils/scenic_route_calculator.dart';
 
 class RouteProvider extends ChangeNotifier {
+  static const String _savedRoutesKey = 'saved_routes';
+
   MotorcycleRoute? _currentRoute;
   RouteOptions _routeOptions = RouteOptions();
   bool _isLoading = false;
@@ -17,6 +21,10 @@ class RouteProvider extends ChangeNotifier {
   LatLng? _startLocation;
   LatLng? _endLocation;
   List<LatLng> _intermediateWaypoints = [];
+
+  RouteProvider() {
+    _loadSavedRoutes();
+  }
 
   MotorcycleRoute? get currentRoute => _currentRoute;
   RouteOptions get routeOptions => _routeOptions;
@@ -108,12 +116,40 @@ class RouteProvider extends ChangeNotifier {
     if (!_savedRoutes.any((r) => r.id == route.id)) {
       _savedRoutes.add(route);
       notifyListeners();
+      _persistSavedRoutes();
     }
   }
 
   void deleteRoute(MotorcycleRoute route) {
     _savedRoutes.removeWhere((r) => r.id == route.id);
     notifyListeners();
+    _persistSavedRoutes();
+  }
+
+  Future<void> _loadSavedRoutes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_savedRoutesKey);
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List;
+        _savedRoutes = list
+            .map((e) => MotorcycleRoute.fromJson(e as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      }
+    } catch (_) {
+      _savedRoutes = [];
+    }
+  }
+
+  Future<void> _persistSavedRoutes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _savedRoutesKey,
+        jsonEncode(_savedRoutes.map((r) => r.toJson()).toList()),
+      );
+    } catch (_) {}
   }
 
   void setRouteOptions(RouteOptions options) {

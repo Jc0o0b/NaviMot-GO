@@ -36,6 +36,48 @@ class MotorcycleRoute {
       roadTypes: [RoadType.highway, RoadType.scenic],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'waypoints': waypoints
+        .map((p) => {'lat': p.latitude, 'lon': p.longitude})
+        .toList(),
+    'name': name,
+    'totalDistance': totalDistance,
+    'estimatedDuration': estimatedDuration,
+    'scenicScore': scenicScore,
+    'roadTypes': roadTypes.map((t) => t.name).toList(),
+    'steps': steps.map((s) => s.toJson()).toList(),
+  };
+
+  factory MotorcycleRoute.fromJson(Map<String, dynamic> json) {
+    RoadType roadTypeFromName(String name) {
+      for (final t in RoadType.values) {
+        if (t.name == name) return t;
+      }
+      return RoadType.local;
+    }
+
+    return MotorcycleRoute(
+      id: json['id'] as String,
+      waypoints: (json['waypoints'] as List)
+          .map((w) => LatLng(
+                (w['lat'] as num).toDouble(),
+                (w['lon'] as num).toDouble(),
+              ))
+          .toList(),
+      name: json['name'] as String,
+      totalDistance: (json['totalDistance'] as num).toDouble(),
+      estimatedDuration: (json['estimatedDuration'] as num).toDouble(),
+      scenicScore: (json['scenicScore'] as num?)?.toInt() ?? 0,
+      roadTypes: (json['roadTypes'] as List? ?? [])
+          .map((t) => roadTypeFromName(t as String))
+          .toList(),
+      steps: (json['steps'] as List? ?? [])
+          .map((s) => RouteStep.fromJson(s as Map<String, dynamic>))
+          .toList(),
+    );
+  }
 }
 
 enum RoadType {
