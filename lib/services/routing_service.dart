@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import '../models/country.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
+import '../utils/country_detector.dart';
+import '../utils/route_geometry.dart';
 import '../utils/scenic_route_calculator.dart';
 
 class RoutingService {
@@ -88,6 +91,64 @@ class RoutingService {
       intermediateWaypoints: intermediateWaypoints,
       label: label,
     );
+  }
+
+  /// Wyznacza trasę omijającą wybrany kraj. Zwraca null, gdy trasa nie
+  /// przechodzi przez ten kraj lub ominięcie nie jest możliwe.
+  Future<MotorcycleRoute?> avoidCountry({
+    required MotorcycleRoute route,
+    required String countryCode,
+    bool avoidHighways = true,
+  }) async {
+    if (route.waypoints.length < 2) return null;
+    final country = Country.byCode(countryCode);
+    if (country == null) return null;
+    final detour =
+        CountryDetector.shared.computeDetourPoints(route.waypoints, country);
+    if (detour == null) return null;
+
+    final via = _orderWaypointsAroundCountry(route, detour, country);
+    final newRoute = await calculateRoute(
+      start: route.waypoints.first,
+      end: route.waypoints.last,
+      waypoints: via,
+      intermediateWaypoints: route.intermediateWaypoints,
+      avoidHighways: avoidHighways,
+      label: route.label == null
+          ? 'Bez: ${country.name}'
+          : '${route.label} · bez ${country.name}',
+    );
+    if (newRoute.totalDistance > route.totalDistance * 4) return null;
+    return newRoute;
+  }
+
+  List<LatLng> _orderWaypointsAroundCountry(
+      MotorcycleRoute route, List<LatLng> detour, Country country) {
+    final intermediates = route.intermediateWaypoints;
+    if (intermediates.isEmpty) return detour;
+
+    final cum = RouteGeometry.cumulativeDistances(route.waypoints);
+    final b = country.bounds.inflated(0.3);
+    double? firstAlong;
+    double? lastAlong;
+    for (var i = 0; i < route.waypoints.length; i++) {
+      if (b.contains(route.waypoints[i])) {
+        firstAlong ??= cum[i];
+        lastAlong = cum[i];
+      }
+    }
+    final crossing = ((firstAlong ?? 0) + (lastAlong ?? 0)) / 2;
+    final before = <LatLng>[];
+    final after = <LatLng>[];
+    for (final w in intermediates) {
+      final a = RouteGeometry.alongRoute(w, route.waypoints, cum);
+      if (a < crossing) {
+        before.add(w);
+      } else {
+        after.add(w);
+      }
+    }
+    return [...before, ...detour, ...after];
   }
 
   Future<List<MotorcycleRoute>> calculateAlternatives({

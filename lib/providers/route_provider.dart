@@ -100,7 +100,18 @@ class RouteProvider extends ChangeNotifier {
       );
 
       _routeAlternatives = alternatives;
-      _currentRoute = _routeOptions.avoidHighways ? alternatives[0] : alternatives[1];
+      var chosen =
+          _routeOptions.avoidHighways ? alternatives[0] : alternatives[1];
+      final skipCode = _routeOptions.skipCountryCode;
+      if (skipCode != null && skipCode.isNotEmpty) {
+        final avoided = await RoutingService.shared.avoidCountry(
+          route: chosen,
+          countryCode: skipCode,
+          avoidHighways: _routeOptions.avoidHighways,
+        );
+        if (avoided != null) chosen = avoided;
+      }
+      _currentRoute = chosen;
       _travelTimeInfo = PolishTrafficRegulations.shared.calculateTravelTime(
         _currentRoute!.totalDistance,
         _currentRoute!.roadTypes,

@@ -11,9 +11,11 @@ import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
+import '../services/traffic_service.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/weather_icon.dart';
 import '../widgets/poi_marker.dart';
+import '../widgets/traffic_overlay.dart';
 import '../utils/route_proximity.dart';
 import 'navigation_screen.dart';
 
@@ -135,6 +137,7 @@ class _MapScreenState extends State<MapScreen>
               ),
               const RepaintBoundary(child: _WaypointMarkersLayer()),
             ],
+            const RepaintBoundary(child: _TrafficOverlayLayer()),
             const RepaintBoundary(child: _WeatherMarkersLayer()),
             RepaintBoundary(child: _POIMarkersLayer(visible: _poisShownOnMap)),
             const RepaintBoundary(child: _EventMarkersLayer()),
@@ -449,6 +452,32 @@ class _WaypointMarkersLayer extends StatelessWidget {
   }
 }
 
+class _TrafficOverlayLayer extends StatelessWidget {
+  const _TrafficOverlayLayer();
+
+  @override
+  Widget build(BuildContext context) {
+    final events = context.watch<EventsProvider>().events;
+    final route = context.watch<RouteProvider>().currentRoute;
+    if (route == null || route.waypoints.length < 2) {
+      return const SizedBox.shrink();
+    }
+    final segments =
+        TrafficService.shared.trafficAlongRoute(route.waypoints, events);
+    if (segments.isEmpty) return const SizedBox.shrink();
+    return PolylineLayer(
+      polylines: [
+        for (final s in segments)
+          Polyline(
+            points: s.points,
+            color: trafficSegmentColor(s.severity),
+            strokeWidth: 6,
+          ),
+      ],
+    );
+  }
+}
+
 class _SummaryOverlay extends StatelessWidget {
   final MotorcycleRoute route;
   final POIProvider poiVM;
@@ -470,8 +499,13 @@ class _SummaryOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final routeVM = context.watch<RouteProvider>();
     final weatherVM = context.watch<WeatherProvider>();
+    final eventsVM = context.watch<EventsProvider>();
     final travel = routeVM.travelTimeInfo;
     final surface = Theme.of(context).colorScheme.surface;
+    final trafficSegments = TrafficService.shared
+        .trafficAlongRoute(route.waypoints, eventsVM.events);
+    final hasBlock = TrafficService.shared.hasBlock(trafficSegments);
+    final hasSlow = TrafficService.shared.hasSlow(trafficSegments);
 
     return Positioned(
       left: 8,
@@ -585,6 +619,14 @@ class _SummaryOverlay extends StatelessWidget {
                             ),
                           ),
                       ],
+                    ),
+                  ],
+                  if (hasBlock || hasSlow) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TrafficLegend(
+                          hasSlow: hasSlow, hasBlock: hasBlock),
                     ),
                   ],
                   if (weatherVM.weatherPoints.isNotEmpty) ...[

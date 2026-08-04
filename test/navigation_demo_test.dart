@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:navimot_go/models/route.dart';
 import 'package:navimot_go/models/route_step.dart';
+import 'package:navimot_go/providers/events_provider.dart';
 import 'package:navimot_go/screens/navigation_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const List<int> _kTransparentPng = <int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
@@ -82,11 +85,18 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
+    SharedPreferences.setMockInitialValues({});
+    final eventsProvider = EventsProvider();
+    await eventsProvider.load();
+
     await tester.pumpWidget(
-      MaterialApp(
-        home: NavigationScreen(
-          route: _syntheticRoute(),
-          tileProvider: _InMemoryTileProvider(),
+      ChangeNotifierProvider.value(
+        value: eventsProvider,
+        child: MaterialApp(
+          home: NavigationScreen(
+            route: _syntheticRoute(),
+            tileProvider: _InMemoryTileProvider(),
+          ),
         ),
       ),
     );

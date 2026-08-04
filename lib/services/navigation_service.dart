@@ -1,3 +1,4 @@
+import '../models/road_event.dart';
 import '../models/route_step.dart';
 
 class NavigationService {
@@ -7,6 +8,29 @@ class NavigationService {
 
   String instructionFor(RouteStep step) {
     return _verbFor(step);
+  }
+
+  /// Komunikat głosowy o nadjeżdżającym zdarzeniu na drodze,
+  /// np. "Za 500 m fotoradar" albo "Za 1000 m kontrola zgłoszona przez
+  /// użytkownika".
+  String alertFor(RoadEvent event, int meters) {
+    final m = meters < 100 ? 100 : meters;
+    return 'Za $m m ${_eventPhrase(event.type)}';
+  }
+
+  String _eventPhrase(RoadEventType type) {
+    switch (type) {
+      case RoadEventType.police:
+        return 'kontrola zgłoszona przez użytkownika';
+      case RoadEventType.speedCamera:
+        return 'fotoradar';
+      case RoadEventType.accident:
+        return 'wypadek na drodze';
+      case RoadEventType.obstacle:
+        return 'przedmiot na drodze';
+      case RoadEventType.breakdown:
+        return 'awaria pojazdu';
+    }
   }
 
   bool shouldSpeak(RouteStep step) {

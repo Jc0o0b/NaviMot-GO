@@ -6,12 +6,18 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import '../models/road_event.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
 import '../models/traffic_regulations.dart';
+import '../providers/events_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/location_service.dart';
 import '../services/navigation_service.dart';
+import '../services/routing_service.dart';
+import '../services/traffic_service.dart';
+import '../widgets/event_widgets.dart';
+import '../widgets/traffic_overlay.dart';
 
 class NavigationScreen extends StatefulWidget {
   final MotorcycleRoute route;
@@ -39,10 +45,15 @@ class _NavigationScreenState extends State<NavigationScreen> {
   double _simSpeedMs = 0;
 
   static const double _routeSnapMeters = 2000;
+  static const double _rerouteThresholdMeters = 5000;
+  static const Duration _rerouteCooldown = Duration(seconds: 30);
 
-  late final List<double> _waypointCumulative;
-  late final List<double> _stepCumulative;
-  late final double _totalDistance;
+  /// Aktualna trasa (może być podmieniona po automatycznym objazdzie).
+  late MotorcycleRoute _route;
+
+  late List<double> _waypointCumulative;
+  late List<double> _stepCumulative;
+  late double _totalDistance;
 
   LatLng? _currentLocation;
   double _currentSpeed = 0;
@@ -56,22 +67,35 @@ class _NavigationScreenState extends State<NavigationScreen> {
   bool _mapReady = false;
   DateTime _lastCameraMove = DateTime.fromMillisecondsSinceEpoch(0);
 
+  bool _rerouting = false;
+  DateTime _lastReroute = DateTime.fromMillisecondsSinceEpoch(0);
+
+  RoadEvent? _upcomingAlert;
+  double _upcomingAlertDistance = double.infinity;
+  final Set<String> _spokenAlerts = {};
+  DateTime _lastAlertCheck = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
-    _waypointCumulative = _cumulativeDistances(widget.route.waypoints);
-    _totalDistance = _waypointCumulative.isNotEmpty
-        ? _waypointCumulative.last
-        : widget.route.totalDistance;
-    _stepCumulative = _computeStepCumulative(widget.route.steps);
+    _route = widget.route;
+    _recomputeRouteCache();
     _nextStepIndex = _nextMeaningfulStepIndex();
     _remainingDistance = _totalDistance;
     _remainingDuration = PolishTrafficRegulations.shared
         .calculateTravelTime(
-            widget.route.totalDistance, widget.route.roadTypes)
+            _route.totalDistance, _route.roadTypes)
         .drivingTime;
     _initTts();
     _startTracking();
+  }
+
+  void _recomputeRouteCache() {
+    _waypointCumulative = _cumulativeDistances(_route.waypoints);
+    _totalDistance = _waypointCumulative.isNotEmpty
+        ? _waypointCumulative.last
+        : _route.totalDistance;
+    _stepCumulative = _computeStepCumulative(_route.steps);
   }
 
   Future<void> _initTts() async {
@@ -81,8 +105,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
       await tts.setSpeechRate(0.48);
       await tts.setVolume(1.0);
       _tts = tts;
-      if (mounted && widget.route.steps.isNotEmpty) {
-        final first = widget.route.steps.first;
+      if (mounted && _route.steps.isNotEmpty) {
+        final first = _route.steps.first;
         if (NavigationService.shared.shouldSpeak(first)) {
           _speak(NavigationService.shared.instructionFor(first));
         }
@@ -126,8 +150,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
       });
       _moveCameraTo(snapped);
     } else {
-      _startSimulation(
-          notice: 'Twoja pozycja jest daleko od trasy — uruchomiono podgląd');
+      _maybeReroute(location, realToRoute);
     }
   }
 
@@ -138,7 +161,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   void _startSimulation({String? notice}) {
-    final pts = widget.route.waypoints;
+    final pts = _route.waypoints;
     if (pts.isEmpty) return;
     _simTimer?.cancel();
     _demoMode = true;
@@ -164,7 +187,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   void _advanceSimulation() {
-    final pts = widget.route.waypoints;
+    final pts = _route.waypoints;
     if (pts.length < 2) return;
     final total = _waypointCumulative.last;
     _simAlong += _simSpeedMs * 0.12;
@@ -185,7 +208,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   LatLng _pointAtAlong(double along) {
-    final pts = widget.route.waypoints;
+    final pts = _route.waypoints;
     var i = 0;
     while (i < pts.length - 2 && _waypointCumulative[i + 1] < along) {
       i++;
@@ -207,7 +230,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final snapped = _snapToRoute(real);
     final realToRoute = _distanceBetween(real, snapped);
     final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
-    if (realToRoute > _routeSnapMeters) return;
+    if (realToRoute > _routeSnapMeters) {
+      _maybeReroute(real, realToRoute);
+      return;
+    }
     if (_demoMode) {
       _simTimer?.cancel();
       _demoMode = false;
@@ -221,7 +247,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   LatLng _snapToRoute(LatLng p) {
-    if (widget.route.waypoints.length < 2) return p;
+    if (_route.waypoints.length < 2) return p;
     return _pointAtAlong(_distanceAlong(p));
   }
 
@@ -237,16 +263,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   void _updateProgress(LatLng loc) {
-    final steps = widget.route.steps;
+    final steps = _route.steps;
     final along = _distanceAlong(loc);
     _remainingDistance = max(0, _totalDistance - along);
     final totalTravel = PolishTrafficRegulations.shared
-        .calculateTravelTime(widget.route.totalDistance,
-            widget.route.roadTypes)
+        .calculateTravelTime(_route.totalDistance,
+            _route.roadTypes)
         .drivingTime;
     _remainingDuration = _totalDistance > 0
         ? totalTravel * (_remainingDistance / _totalDistance)
         : 0;
+    _updateAlert(along);
     if (steps.isEmpty) return;
 
     var cs = 0;
@@ -277,12 +304,114 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   int _nextMeaningfulStepIndex() {
-    final steps = widget.route.steps;
+    final steps = _route.steps;
     if (steps.isEmpty) return -1;
     for (var i = _currentStepIndex + 1; i < steps.length; i++) {
       if (NavigationService.shared.shouldSpeak(steps[i])) return i;
     }
     return steps.length - 1;
+  }
+
+  void _updateAlert(double along) {
+    final now = DateTime.now();
+    if (now.difference(_lastAlertCheck).inMilliseconds < 400) return;
+    _lastAlertCheck = now;
+    final events = context.read<EventsProvider>().events;
+    RoadEvent? nearest;
+    var nearestDist = double.infinity;
+    for (final e in events) {
+      final d = _distanceAlong(LatLng(e.lat, e.lon)) - along;
+      if (d < -50 || d > 1200) continue;
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = e;
+      }
+    }
+    _upcomingAlert = nearest;
+    _upcomingAlertDistance = nearestDist == double.infinity
+        ? double.infinity
+        : max(0.0, nearestDist);
+    if (nearest == null || nearestDist == double.infinity) return;
+    final double speakAt;
+    switch (nearest.type) {
+      case RoadEventType.speedCamera:
+        speakAt = 500;
+      case RoadEventType.police:
+      case RoadEventType.accident:
+        speakAt = 1000;
+      case RoadEventType.obstacle:
+      case RoadEventType.breakdown:
+        speakAt = 800;
+    }
+    if (nearestDist <= speakAt && _spokenAlerts.add(nearest.id)) {
+      _speak(NavigationService.shared.alertFor(nearest, nearestDist.round()));
+    }
+  }
+
+  void _maybeReroute(LatLng real, double realToRoute) {
+    if (!mounted || _arrived || _demoMode) return;
+    if (realToRoute <= _rerouteThresholdMeters) return;
+    final now = DateTime.now();
+    if (now.difference(_lastReroute) < _rerouteCooldown) return;
+    _lastReroute = now;
+    final dest = _route.waypoints.last;
+    _doReroute(real, dest, true);
+  }
+
+  Future<void> _doReroute(
+      LatLng origin, LatLng destination, bool avoidHighways) async {
+    if (_rerouting) return;
+    setState(() => _rerouting = true);
+    try {
+      final result = await RoutingService.shared.calculateRoute(
+        start: origin,
+        end: destination,
+        avoidHighways: avoidHighways,
+      );
+      _handleRerouteResult(origin, result);
+    } catch (_) {
+      _maybeRerouteFailed();
+    }
+  }
+
+  void _handleRerouteResult(LatLng origin, MotorcycleRoute? result) {
+    if (!mounted) return;
+    if (result == null ||
+        result.waypoints.length < 2 ||
+        _distanceBetween(origin, result.waypoints.first) > 2000) {
+      _maybeRerouteFailed();
+      return;
+    }
+    setState(() {
+      _route = result;
+      _recomputeRouteCache();
+      _spokenStepIndex = -1;
+      _spokenAlerts.clear();
+      _currentStepIndex = 0;
+      _nextStepIndex = _nextMeaningfulStepIndex();
+      _simAlong = _distanceAlong(_currentLocation ?? origin);
+      _currentLocation = _snapToRoute(origin);
+      _remainingDistance = _totalDistance;
+      _remainingDuration = PolishTrafficRegulations.shared
+          .calculateTravelTime(_route.totalDistance, _route.roadTypes)
+          .drivingTime;
+      _updateProgress(_currentLocation!);
+      _rerouting = false;
+    });
+    _moveCameraTo(_currentLocation!);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Wyznaczono objazd — zmieniono trasę'),
+      duration: Duration(seconds: 3),
+    ));
+  }
+
+  void _maybeRerouteFailed() {
+    if (!mounted) return;
+    setState(() => _rerouting = false);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Nie udało się wyznaczyć objazdu — trwa nawigacja po starej trasie'),
+      duration: Duration(seconds: 3),
+    ));
   }
 
   Future<void> _speak(String text) async {
@@ -317,6 +446,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final events = context.watch<EventsProvider>().events;
+    final trafficSegments = TrafficService.shared
+        .trafficAlongRoute(_route.waypoints, events);
     return Scaffold(
       body: Stack(
         children: [
@@ -325,7 +457,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               mapController: _mapController,
               options: MapOptions(
                 initialCenter:
-                    _currentLocation ?? widget.route.waypoints.first,
+                    _currentLocation ?? _route.waypoints.first,
                 initialZoom: 15,
                 onMapReady: () {
                   _mapReady = true;
@@ -335,7 +467,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   } else {
                     try {
                       _mapController.fitCamera(CameraFit.coordinates(
-                        coordinates: widget.route.waypoints,
+                        coordinates: _route.waypoints,
                         padding: const EdgeInsets.all(10),
                       ));
                     } catch (_) {}
@@ -350,32 +482,68 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   tileProvider:
                       widget.tileProvider ?? NetworkTileProvider(),
                 ),
-                if (widget.route.waypoints.length > 1) ...[
+                if (_route.waypoints.length > 1) ...[
                   PolylineLayer(
                     polylines: [
                       Polyline(
-                        points: widget.route.waypoints,
+                        points: _route.waypoints,
                         color: Colors.white,
                         strokeWidth: 6,
                       ),
                       Polyline(
-                        points: widget.route.waypoints,
+                        points: _route.waypoints,
                         color: Colors.deepOrange,
                         strokeWidth: 4,
                       ),
                     ],
                   ),
+                  if (trafficSegments.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        for (final s in trafficSegments)
+                          Polyline(
+                            points: s.points,
+                            color: trafficSegmentColor(s.severity),
+                            strokeWidth: 6,
+                          ),
+                      ],
+                    ),
+                  if (events.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        for (final e in events)
+                          Marker(
+                            point: LatLng(e.lat, e.lon),
+                            width: 30,
+                            height: 30,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: roadEventColor(e.type), width: 2),
+                                boxShadow: const [
+                                  BoxShadow(
+                                      color: Colors.black38, blurRadius: 4),
+                                ],
+                              ),
+                              child: Icon(eventIcon(e.type),
+                                  size: 16, color: roadEventColor(e.type)),
+                            ),
+                          ),
+                      ],
+                    ),
                   MarkerLayer(
                     markers: [
                       Marker(
-                        point: widget.route.waypoints.first,
+                        point: _route.waypoints.first,
                         width: 32,
                         height: 32,
                         child: const Icon(Icons.motorcycle,
                             color: Colors.green, size: 28),
                       ),
                       Marker(
-                        point: widget.route.waypoints.last,
+                        point: _route.waypoints.last,
                         width: 32,
                         height: 32,
                         child: const Icon(Icons.flag,
@@ -383,10 +551,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       ),
                     ],
                   ),
-                  if (widget.intermediateWaypoints.isNotEmpty)
+                  if (_route.intermediateWaypoints.isNotEmpty)
                     MarkerLayer(
                       markers: [
-                        for (final wp in widget.intermediateWaypoints)
+                        for (final wp in _route.intermediateWaypoints)
                           Marker(
                             point: wp,
                             width: 34,
@@ -461,7 +629,40 @@ class _NavigationScreenState extends State<NavigationScreen> {
               top: MediaQuery.of(context).padding.top + 8,
               left: 8,
               right: 8,
-              child: _buildInstructionBanner(),
+              child: Column(
+                children: [
+                  _buildInstructionBanner(),
+                  if (_upcomingAlert != null && !_rerouting) ...[
+                    const SizedBox(height: 8),
+                    _buildAlertBanner(),
+                  ],
+                ],
+              ),
+            ),
+          if (_rerouting)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 8,
+              right: 8,
+              child: Card(
+                color: Theme.of(context).colorScheme.surface,
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                          width: 18,
+                          height: 18,
+                          child:
+                              CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 12),
+                      Text('Wyznaczam objazd...',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           if (!_arrived)
             Positioned(
@@ -477,7 +678,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Widget _buildInstructionBanner() {
-    final steps = widget.route.steps;
+    final steps = _route.steps;
     if (steps.isEmpty) return const SizedBox.shrink();
     final step = steps[_nextStepIndex];
     final instruction = NavigationService.shared.instructionFor(step);
@@ -512,6 +713,38 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertBanner() {
+    final e = _upcomingAlert;
+    if (e == null) return const SizedBox.shrink();
+    final color = roadEventColor(e.type);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+      ),
+      child: Row(
+        children: [
+          Icon(eventIcon(e.type), color: Colors.white, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${e.type.label} — '
+              '${_upcomingAlertDistance == double.infinity ? '?' : _formatDistance(_upcomingAlertDistance)}',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -680,7 +913,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   double _distanceAlong(LatLng p) {
-    final pts = widget.route.waypoints;
+    final pts = _route.waypoints;
     if (pts.length < 2) return 0;
     const scale = 111320.0;
     var best = double.infinity;

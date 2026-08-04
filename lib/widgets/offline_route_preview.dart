@@ -3,18 +3,22 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../models/important_place.dart';
 import '../models/road_event.dart';
 import '../models/route.dart';
-import '../widgets/event_widgets.dart' show eventIcon;
+import '../widgets/event_widgets.dart' show eventIcon, roadEventColor;
 
 class OfflineRoutePreview extends StatelessWidget {
   final MotorcycleRoute route;
   final List<RoadEvent> events;
   final List<ImportantPlace> places;
 
+  /// Etykieta w rogu podglądu; null ukrywa etykietę.
+  final String? label;
+
   const OfflineRoutePreview({
     super.key,
     required this.route,
     this.events = const [],
     this.places = const [],
+    this.label = 'Podgląd trasy (offline)',
   });
 
   @override
@@ -28,6 +32,7 @@ class OfflineRoutePreview extends StatelessWidget {
           intermediateWaypoints: route.intermediateWaypoints,
           events: events,
           places: places,
+          label: label,
         ),
       ),
     );
@@ -39,12 +44,14 @@ class _RoutePreviewPainter extends CustomPainter {
   final List<LatLng> intermediateWaypoints;
   final List<RoadEvent> events;
   final List<ImportantPlace> places;
+  final String? label;
 
   _RoutePreviewPainter({
     required this.waypoints,
     this.intermediateWaypoints = const [],
     this.events = const [],
     this.places = const [],
+    this.label = 'Podgląd trasy (offline)',
   });
 
   @override
@@ -147,7 +154,7 @@ class _RoutePreviewPainter extends CustomPainter {
         _paintBadge(
           canvas,
           o,
-          color: _eventColor(e.type),
+          color: roadEventColor(e.type),
           icon: eventIcon(e.type),
           size: 14,
         );
@@ -167,14 +174,17 @@ class _RoutePreviewPainter extends CustomPainter {
       }
     }
 
-    final label = TextPainter(
-      text: const TextSpan(
-        text: 'Podgląd trasy (offline)',
-        style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    label.paint(canvas, Offset(10, 8));
+    if (label != null) {
+      final labelTp = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+              fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      labelTp.paint(canvas, Offset(10, 8));
+    }
   }
 
   bool _inside(LatLng p, double minLat, double maxLat, double minLon,
@@ -186,21 +196,6 @@ class _RoutePreviewPainter extends CustomPainter {
       return false;
     }
     return true;
-  }
-
-  Color _eventColor(RoadEventType type) {
-    switch (type) {
-      case RoadEventType.police:
-        return Colors.blue;
-      case RoadEventType.speedCamera:
-        return Colors.red;
-      case RoadEventType.accident:
-        return Colors.deepOrange;
-      case RoadEventType.obstacle:
-        return Colors.orange;
-      case RoadEventType.breakdown:
-        return Colors.brown;
-    }
   }
 
   void _paintBadge(Canvas canvas, Offset center,
@@ -228,5 +223,6 @@ class _RoutePreviewPainter extends CustomPainter {
       oldDelegate.waypoints != waypoints ||
       oldDelegate.intermediateWaypoints != intermediateWaypoints ||
       oldDelegate.events != events ||
-      oldDelegate.places != places;
+      oldDelegate.places != places ||
+      oldDelegate.label != label;
 }

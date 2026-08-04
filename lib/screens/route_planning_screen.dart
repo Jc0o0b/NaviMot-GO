@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import '../models/country.dart';
 import '../models/route.dart';
 import '../models/traffic_regulations.dart';
 import '../providers/events_provider.dart';
@@ -10,9 +11,13 @@ import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
 import '../services/geocoding_service.dart';
 import '../services/location_service.dart';
+import '../services/traffic_service.dart';
 import '../utils/route_proximity.dart';
+import '../widgets/event_widgets.dart';
 import '../widgets/home_sheet.dart';
+import '../widgets/offline_route_preview.dart';
 import '../widgets/section_header.dart';
+import '../widgets/traffic_overlay.dart';
 import 'navigation_screen.dart';
 
 class RoutePlanningScreen extends StatefulWidget {
@@ -332,6 +337,51 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 routeVM.setRouteOptions(routeVM.routeOptions);
               },
             ),
+            const Divider(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.public, color: Colors.deepOrange, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pomiń kraj na trasie',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('Omijaj wybrany kraj, przez który przebiega trasa',
+                          style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<String?>(
+                  value: routeVM.routeOptions.skipCountryCode,
+                  underline: const SizedBox.shrink(),
+                  icon: const Icon(Icons.arrow_drop_down),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('Brak'),
+                    ),
+                    for (final c in Country.all)
+                      DropdownMenuItem<String?>(
+                        value: c.code,
+                        child: Text(c.name),
+                      ),
+                  ],
+                  onChanged: (code) {
+                    routeVM.routeOptions.skipCountryCode = code;
+                    routeVM.setRouteOptions(routeVM.routeOptions);
+                    final start = routeVM.startLocation;
+                    final end = routeVM.endLocation;
+                    if (code != null && start != null && end != null) {
+                      setState(() => _navigateOnReady = false);
+                      routeVM.planRoute(start, end);
+                    }
+                  },
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -346,6 +396,16 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       5000,
       (p) => LatLng(p.lat, p.lon),
     );
+    final nearEvents = itemsWithinRoute(
+      eventsVM.events,
+      route.waypoints,
+      5000,
+      (e) => LatLng(e.lat, e.lon),
+    );
+    final traffic =
+        TrafficService.shared.trafficAlongRoute(route.waypoints, nearEvents);
+    final hasBlock = TrafficService.shared.hasBlock(traffic);
+    final hasSlow = TrafficService.shared.hasSlow(traffic);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -380,6 +440,55 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 ),
               ],
             ),
+            if (hasBlock || hasSlow) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: (hasBlock ? Colors.red : Colors.orange).withValues(
+                      alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: hasBlock ? Colors.red : Colors.orange,
+                      width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasBlock
+                          ? Icons.block
+                          : Icons.traffic,
+                      size: 18,
+                      color: hasBlock ? Colors.red : Colors.orange,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hasBlock
+                            ? 'Uwaga: blokada drogi na trasie (czerwone odcinki na linii trasy)'
+                            : 'Uwaga: spowolnienia ruchu na trasie (pomarańczowe odcinki na linii trasy)',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 170,
+              child: OfflineRoutePreview(
+                route: route,
+                events: nearEvents,
+                places: nearPlaces,
+                label: null,
+              ),
+            ),
+            if (hasBlock || hasSlow) ...[
+              const SizedBox(height: 8),
+              TrafficLegend(hasSlow: hasSlow, hasBlock: hasBlock),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
@@ -423,6 +532,59 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
+            if (nearEvents.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Colors.red, size: 20),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text('Wydarzenia na trasie',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Zgłoszone przez użytkowników oraz dane live traffic',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              for (final e in nearEvents.take(6))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(eventIcon(e.type),
+                          size: 16, color: roadEventColor(e.type)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(e.type.label,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            if (e.description != null &&
+                                e.description!.isNotEmpty)
+                              Text(e.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
             if (nearPlaces.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),

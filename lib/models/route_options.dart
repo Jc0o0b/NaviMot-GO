@@ -11,5 +11,8 @@ class RouteOptions {
   bool avoidTolls = false;
   bool preferElevation = true;
 
+  /// Kod kraju (np. 'DE'), który ma zostać pominięty na trasie; null = brak.
+  String? skipCountryCode;
+
   RouteOptions();
 }

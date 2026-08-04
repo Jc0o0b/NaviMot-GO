@@ -24,6 +24,21 @@ IconData eventIcon(RoadEventType type) {
   }
 }
 
+Color roadEventColor(RoadEventType type) {
+  switch (type) {
+    case RoadEventType.police:
+      return Colors.blue;
+    case RoadEventType.speedCamera:
+      return Colors.red;
+    case RoadEventType.accident:
+      return Colors.deepOrange;
+    case RoadEventType.obstacle:
+      return Colors.orange;
+    case RoadEventType.breakdown:
+      return Colors.brown;
+  }
+}
+
 class RoadEventMarker extends StatelessWidget {
   final RoadEventType type;
   final bool selected;
