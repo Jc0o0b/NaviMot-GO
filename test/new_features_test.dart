@@ -55,7 +55,7 @@ void main() {
     );
   });
 
-  test('Komunikaty nawigacyjne bez dystansu, z końcem drogi', () {
+  test('Uproszczone komunikaty nawigacyjne', () {
     final turn = RouteStep(
       type: 'turn',
       modifier: 'right',
@@ -68,7 +68,7 @@ void main() {
     );
     expect(
       NavigationService.shared.instructionFor(turn),
-      'skręć w prawo w ulicę Prosta',
+      'Skręć w prawo',
     );
 
     final endOfRoad = RouteStep(
@@ -83,7 +83,22 @@ void main() {
     );
     expect(
       NavigationService.shared.instructionFor(endOfRoad),
-      'na końcu drogi skręć w lewo',
+      'Skręć w lewo',
+    );
+
+    final fork = RouteStep(
+      type: 'fork',
+      modifier: 'right',
+      name: '',
+      ref: '',
+      location: const LatLng(52.0, 21.0),
+      distance: 100,
+      duration: 10,
+      geometry: const [],
+    );
+    expect(
+      NavigationService.shared.instructionFor(fork),
+      'Trzymaj się prawej',
     );
   });
 

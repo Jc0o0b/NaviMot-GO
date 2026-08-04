@@ -98,24 +98,11 @@ class SavedRoutesScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 12)),
               ],
             ),
-            Row(
-              children: [
-                const Icon(Icons.star, size: 14, color: Colors.yellow),
-                const SizedBox(width: 4),
-                Text('${route.scenicScore}/100',
-                    style: const TextStyle(fontSize: 12)),
-                if (route.roadTypes.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(route.roadTypes.map((t) => t.label).join(', '),
-                        style:
-                            const TextStyle(fontSize: 11, color: Colors.grey),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-              ],
-            ),
+            if (route.roadTypes.isNotEmpty)
+              Text(route.roadTypes.map((t) => t.label).join(', '),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
           ],
         ),
         trailing: Row(
@@ -285,9 +272,6 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                                           widget.route.roadTypes)
                                       .drivingTime),
                               'Czas'),
-                          const SizedBox(width: 8),
-                          _statBox(Icons.star, '${widget.route.scenicScore}',
-                              'Malowniczość'),
                         ],
                       ),
                       if (widget.route.roadTypes.isNotEmpty) ...[

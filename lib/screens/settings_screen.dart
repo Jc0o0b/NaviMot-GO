@@ -26,6 +26,7 @@ class SettingsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              const _SectionLabel('Wygląd'),
               Card(
                 child: SwitchListTile(
                   secondary: const Icon(Icons.dark_mode_outlined,
@@ -39,6 +40,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              const _SectionLabel('Nawigacja i dźwięk'),
               Card(
                 child: Column(
                   children: [
@@ -68,6 +70,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              const _SectionLabel('Twój profil'),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -118,6 +121,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              const _SectionLabel('Informacje'),
               Card(
                 child: Column(
                   children: [
@@ -161,8 +165,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showAbout(BuildContext context) {
-    showAboutDialog(
+  void _showAbout(BuildContext context) {    showAboutDialog(
       context: context,
       applicationName: 'NaviMot GO',
       applicationVersion: '1.0.0',
@@ -177,6 +180,23 @@ class SettingsScreen extends StatelessWidget {
         SizedBox(height: 8),
         Text('NaviMot GO używa otwartych danych mapowych oraz usług wyznaczania tras.'),
       ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+            fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+      ),
     );
   }
 }

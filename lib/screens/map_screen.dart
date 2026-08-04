@@ -515,11 +515,6 @@ class _SummaryOverlay extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Icon(Icons.star, size: 16, color: Colors.amber),
-                      const SizedBox(width: 2),
-                      Text('${route.scenicScore}',
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   if (travel != null) ...[
@@ -533,8 +528,6 @@ class _SummaryOverlay extends StatelessWidget {
                             travel.formattedTotalTime, 'Z przerwami'),
                         _summaryItem(Icons.straighten, travel.formattedDistance,
                             'Dystans'),
-                        _summaryItem(
-                            Icons.speed, travel.formattedSpeed, 'Średnia'),
                       ],
                     ),
                   ],
@@ -958,8 +951,7 @@ class _AlternativeTile extends StatelessWidget {
             if (selected)
               const Icon(Icons.check_circle, color: Colors.deepOrange, size: 18)
             else
-              Text('${route.scenicScore} pkt',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
           ],
         ),
       ),

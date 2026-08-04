@@ -29,9 +29,8 @@ class NavigationService {
         return 'Dotarłeś do celu';
       case 'turn':
       case 'end of road':
-        return _turnVerb(modifier, step.name, endOfRoad: step.type == 'end of road');
+        return _turnVerb(modifier);
       case 'new name':
-        return 'Jedź dalej prosto${_roadSuffix(step.name)}';
       case 'continue':
         return 'Jedź prosto';
       case 'merge':
@@ -42,48 +41,41 @@ class NavigationService {
         return 'Zjedź z drogi szybkiego ruchu';
       case 'fork':
         return modifier.contains('left')
-            ? 'Trzymaj się lewej strony'
+            ? 'Trzymaj się lewej'
             : modifier.contains('right')
-                ? 'Trzymaj się prawej strony'
+                ? 'Trzymaj się prawej'
                 : 'Wybierz właściwą drogę';
       case 'roundabout':
       case 'rotary':
       case 'exit roundabout':
-        return 'Na rondzie zjedź właściwym wyjazdem';
+        return 'Na rondzie zjedź wyjazdem';
       case 'restricted':
-        return 'Uwaga, droga zastrzeżona';
+        return 'Droga zastrzeżona';
       default:
         return 'Jedź prosto';
     }
   }
 
-  String _turnVerb(String modifier, String name, {bool endOfRoad = false}) {
-    final road = _roadSuffix(name);
-    final endPart = endOfRoad ? 'na końcu drogi ' : '';
+  String _turnVerb(String modifier) {
     switch (modifier) {
       case 'left':
-        return '${endPart}skręć w lewo$road';
+        return 'Skręć w lewo';
       case 'right':
-        return '${endPart}skręć w prawo$road';
+        return 'Skręć w prawo';
       case 'slight left':
-        return '${endPart}delikatnie skręć w lewo$road';
+        return 'Skręć w lewo';
       case 'slight right':
-        return '${endPart}delikatnie skręć w prawo$road';
+        return 'Skręć w prawo';
       case 'sharp left':
-        return '${endPart}ostro skręć w lewo$road';
+        return 'Ostro skręć w lewo';
       case 'sharp right':
-        return '${endPart}ostro skręć w prawo$road';
+        return 'Ostro skręć w prawo';
       case 'straight':
         return 'Jedź prosto';
       case 'uturn':
         return 'Zawróć';
       default:
-        return '${endPart}skręć$road';
+        return 'Skręć';
     }
-  }
-
-  String _roadSuffix(String name) {
-    if (name.isEmpty) return '';
-    return ' w ulicę $name';
   }
 }

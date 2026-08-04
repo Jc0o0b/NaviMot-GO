@@ -203,18 +203,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   void _updateProgress(LatLng loc) {
     final steps = widget.route.steps;
-    if (steps.isEmpty) {
-      _remainingDistance = max(0, _totalDistance - _distanceAlong(loc));
-      final totalTravel = PolishTrafficRegulations.shared
-          .calculateTravelTime(widget.route.totalDistance,
-              widget.route.roadTypes)
-          .drivingTime;
-      _remainingDuration =
-          _totalDistance > 0 ? totalTravel * (_remainingDistance / _totalDistance) : 0;
-      return;
-    }
     final along = _distanceAlong(loc);
     _remainingDistance = max(0, _totalDistance - along);
+    final totalTravel = PolishTrafficRegulations.shared
+        .calculateTravelTime(widget.route.totalDistance,
+            widget.route.roadTypes)
+        .drivingTime;
+    _remainingDuration = _totalDistance > 0
+        ? totalTravel * (_remainingDistance / _totalDistance)
+        : 0;
+    if (steps.isEmpty) return;
 
     var cs = 0;
     for (var i = 0; i < _stepCumulative.length; i++) {
@@ -223,16 +221,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _currentStepIndex = cs;
     _nextStepIndex = _nextMeaningfulStepIndex();
     _distanceToNext = max(0, _stepCumulative[_nextStepIndex] - along);
-
-    final step = steps[_currentStepIndex];
-    final stepLen = step.distance > 0 ? step.distance : 1.0;
-    final fracInStep = ((along - _stepCumulative[_currentStepIndex]) / stepLen)
-        .clamp(0.0, 1.0);
-    var rem = step.duration * (1 - fracInStep);
-    for (var i = _currentStepIndex + 1; i < steps.length; i++) {
-      rem += steps[i].duration;
-    }
-    _remainingDuration = max(0, rem);
 
     final lastIsArrive = steps.last.type == 'arrive';
     if (lastIsArrive &&
@@ -503,11 +491,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         fontSize: 17, fontWeight: FontWeight.bold),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
-                if (step.name.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(step.name,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    'za ${_formatDistance(_distanceToNext)}',
+                    if (step.name.isNotEmpty) step.name,
+                  ].join(' · '),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
