@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
-import '../widgets/home_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback? onBackToMap;
@@ -101,23 +100,6 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: ListTile(
-                  leading:
-                      const Icon(Icons.home_outlined, color: Colors.deepOrange),
-                  title: const Text('Adres domowy',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(
-                    settings.home?.name ?? 'Ustaw adres domowy',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showHomeSheet(context),
                 ),
               ),
               const SizedBox(height: 12),

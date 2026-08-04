@@ -529,6 +529,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final min = (_remainingDuration / 60).round();
     final timeText =
         min >= 60 ? 'ok. ${min ~/ 60}h ${min % 60}min' : 'ok. $min min';
+    final arrival = DateTime.now()
+        .add(Duration(seconds: _remainingDuration.toInt()));
+    final arrivalText = 'Przyjazd ok. '
+        '${arrival.hour.toString().padLeft(2, '0')}:'
+        '${arrival.minute.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -570,6 +575,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           fontSize: 18, fontWeight: FontWeight.bold)),
                   Text(timeText,
                       style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(arrivalText,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.deepOrange,
+                          fontWeight: FontWeight.w600)),
                 ],
               ),
             ),

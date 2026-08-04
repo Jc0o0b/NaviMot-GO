@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/route.dart';
+import '../models/traffic_regulations.dart';
 import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
@@ -363,6 +364,22 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
             const SizedBox(height: 4),
             Text(route.name,
                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.alarm, size: 15, color: Colors.deepOrange),
+                const SizedBox(width: 6),
+                Text(
+                  'Przyjazd ok. ${PolishTrafficRegulations.shared
+                      .calculateTravelTime(route.totalDistance, route.roadTypes)
+                      .formattedArrival()}',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.deepOrange),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Row(
               children: [

@@ -82,6 +82,14 @@ class TravelTimeInfo {
   }
   String get formattedSpeed => '${averageSpeed.toInt()} km/h';
 
+  String formattedArrival([DateTime? now]) {
+    final t = (now ?? DateTime.now())
+        .add(Duration(seconds: drivingTime.toInt()));
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
   String _formatTime(double seconds) {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
