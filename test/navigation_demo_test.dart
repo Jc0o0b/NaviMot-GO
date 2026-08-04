@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:navimot_go/models/route.dart';
 import 'package:navimot_go/models/route_step.dart';
 import 'package:navimot_go/providers/events_provider.dart';
+import 'package:navimot_go/providers/route_provider.dart';
 import 'package:navimot_go/screens/navigation_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,10 +89,14 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final eventsProvider = EventsProvider();
     await eventsProvider.load();
+    final routeProvider = RouteProvider();
 
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: eventsProvider,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: routeProvider),
+          ChangeNotifierProvider.value(value: eventsProvider),
+        ],
         child: MaterialApp(
           home: NavigationScreen(
             route: _syntheticRoute(),

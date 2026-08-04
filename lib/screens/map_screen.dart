@@ -16,6 +16,7 @@ import '../widgets/event_widgets.dart';
 import '../widgets/weather_icon.dart';
 import '../widgets/poi_marker.dart';
 import '../widgets/traffic_overlay.dart';
+import '../utils/route_geometry.dart';
 import '../utils/route_proximity.dart';
 import 'navigation_screen.dart';
 
@@ -109,13 +110,13 @@ class _MapScreenState extends State<MapScreen>
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: route.waypoints,
+                    points: RouteGeometry.decimate(route.waypoints, 1200),
                     color: Colors.white,
                     strokeWidth: 8,
                   ),
                   if (_animDone)
                     Polyline(
-                      points: route.waypoints,
+                      points: RouteGeometry.decimate(route.waypoints, 1200),
                       color: Colors.deepOrange,
                       strokeWidth: 5,
                     )
@@ -260,7 +261,7 @@ class _MapScreenState extends State<MapScreen>
       return;
     }
     final target = anim == null ? total : max(1, (anim.value * total).round());
-    if (target != _animCount && (target - _animCount).abs() >= 6) {
+    if (target != _animCount && (target - _animCount).abs() >= 24) {
       setState(() => _animCount = target);
     }
   }
@@ -384,8 +385,9 @@ class _EventMarkersLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final eventsVM = context.watch<EventsProvider>();
     final route = context.watch<RouteProvider>().currentRoute;
+    final cameras = context.watch<RouteProvider>().routeCameras;
 
-    var events = eventsVM.events;
+    var events = [...eventsVM.events, ...cameras];
     var places = eventsVM.importantPlaces;
     if (route != null && route.waypoints.isNotEmpty) {
       events = itemsWithinRoute(

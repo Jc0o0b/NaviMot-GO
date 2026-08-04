@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/road_event.dart';
 import '../models/route.dart';
 import '../models/route_options.dart';
 import '../models/traffic_regulations.dart';
+import '../services/camera_service.dart';
 import '../services/routing_service.dart';
 import '../services/location_service.dart';
 import '../utils/scenic_route_calculator.dart';
@@ -18,6 +20,7 @@ class RouteProvider extends ChangeNotifier {
   String? _errorMessage;
   List<MotorcycleRoute> _savedRoutes = [];
   List<MotorcycleRoute> _routeAlternatives = [];
+  List<RoadEvent> _routeCameras = [];
   TravelTimeInfo? _travelTimeInfo;
   LatLng? _startLocation;
   LatLng? _endLocation;
@@ -33,6 +36,7 @@ class RouteProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   List<MotorcycleRoute> get savedRoutes => _savedRoutes;
   List<MotorcycleRoute> get routeAlternatives => List.unmodifiable(_routeAlternatives);
+  List<RoadEvent> get routeCameras => List.unmodifiable(_routeCameras);
   TravelTimeInfo? get travelTimeInfo => _travelTimeInfo;
   LatLng? get startLocation => _startLocation;
   LatLng? get endLocation => _endLocation;
@@ -73,6 +77,7 @@ class RouteProvider extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _routeAlternatives = [];
+    _routeCameras = [];
     notifyListeners();
 
     try {
@@ -118,6 +123,7 @@ class RouteProvider extends ChangeNotifier {
       );
       _isLoading = false;
       notifyListeners();
+      _loadRouteCameras(chosen);
     } catch (e) {
       _errorMessage = 'Nie udało się wyznaczyć trasy: $e';
       _isLoading = false;
@@ -127,10 +133,19 @@ class RouteProvider extends ChangeNotifier {
 
   void selectRoute(MotorcycleRoute route) {
     _currentRoute = route;
+    _routeCameras = [];
     _travelTimeInfo = PolishTrafficRegulations.shared.calculateTravelTime(
       route.totalDistance,
       route.roadTypes,
     );
+    notifyListeners();
+    _loadRouteCameras(route);
+  }
+
+  Future<void> _loadRouteCameras(MotorcycleRoute route) async {
+    final cameras = await CameraService.shared.camerasForRoute(route.waypoints);
+    if (_currentRoute?.id != route.id) return;
+    _routeCameras = cameras;
     notifyListeners();
   }
 

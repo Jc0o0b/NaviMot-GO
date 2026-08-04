@@ -60,6 +60,16 @@ class RouteGeometry {
     return bestAlong;
   }
 
+  /// Zmniejsza liczbę punktów do co najwyżej [target] (np. do rysowania).
+  static List<LatLng> decimate(List<LatLng> pts, int target) {
+    if (pts.length <= target) return pts;
+    final out = <LatLng>[];
+    for (var i = 0; i < target; i++) {
+      out.add(pts[(i * (pts.length - 1) / (target - 1)).round()]);
+    }
+    return out;
+  }
+
   /// Punkt na trasie w odległości [along] (m) od startu.
   static LatLng pointAtAlong(
       double along, List<LatLng> pts, List<double> cum) {

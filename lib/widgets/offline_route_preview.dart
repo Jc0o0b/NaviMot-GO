@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import '../models/important_place.dart';
 import '../models/road_event.dart';
 import '../models/route.dart';
+import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart' show eventIcon, roadEventColor;
 
 class OfflineRoutePreview extends StatelessWidget {
@@ -94,7 +95,7 @@ class _RoutePreviewPainter extends CustomPainter {
       );
     }
 
-    final pts = waypoints.map(project).toList();
+    final pts = RouteGeometry.decimate(waypoints, 1000).map(project).toList();
 
     for (var i = 0; i < pts.length - 1; i++) {
       final halo = Paint()

@@ -397,7 +397,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       (p) => LatLng(p.lat, p.lon),
     );
     final nearEvents = itemsWithinRoute(
-      eventsVM.events,
+      [...eventsVM.events, ...routeVM.routeCameras],
       route.waypoints,
       5000,
       (e) => LatLng(e.lat, e.lon),

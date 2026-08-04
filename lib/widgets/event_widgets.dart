@@ -46,15 +46,16 @@ class RoadEventMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = roadEventColor(type);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: selected ? Colors.deepOrange : Colors.red, width: 2),
+            color: selected ? Colors.deepOrange : color, width: 2),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 5)],
       ),
-      child: Icon(Icons.warning, color: Colors.red, size: 28),
+      child: Icon(eventIcon(type), color: color, size: 28),
     );
   }
 }

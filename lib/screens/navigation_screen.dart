@@ -11,11 +11,13 @@ import '../models/route.dart';
 import '../models/route_step.dart';
 import '../models/traffic_regulations.dart';
 import '../providers/events_provider.dart';
+import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/location_service.dart';
 import '../services/navigation_service.dart';
 import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
+import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/traffic_overlay.dart';
 
@@ -316,7 +318,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final now = DateTime.now();
     if (now.difference(_lastAlertCheck).inMilliseconds < 400) return;
     _lastAlertCheck = now;
-    final events = context.read<EventsProvider>().events;
+    final events = [
+      ...context.read<RouteProvider>().routeCameras,
+      ...context.read<EventsProvider>().events,
+    ];
     RoadEvent? nearest;
     var nearestDist = double.infinity;
     for (final e in events) {
@@ -446,7 +451,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final events = context.watch<EventsProvider>().events;
+    final events = [
+      ...context.watch<RouteProvider>().routeCameras,
+      ...context.watch<EventsProvider>().events,
+    ];
     final trafficSegments = TrafficService.shared
         .trafficAlongRoute(_route.waypoints, events);
     return Scaffold(
@@ -486,12 +494,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   PolylineLayer(
                     polylines: [
                       Polyline(
-                        points: _route.waypoints,
+                        points: RouteGeometry.decimate(_route.waypoints, 1200),
                         color: Colors.white,
                         strokeWidth: 6,
                       ),
                       Polyline(
-                        points: _route.waypoints,
+                        points: RouteGeometry.decimate(_route.waypoints, 1200),
                         color: Colors.deepOrange,
                         strokeWidth: 4,
                       ),

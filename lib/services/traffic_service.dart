@@ -17,6 +17,9 @@ class TrafficService {
     RoadEventType.breakdown,
   };
 
+  String? _cacheKey;
+  List<TrafficSegment> _cached = const [];
+
   /// Domyślne parametry zasięgu.
   static const double _corridorMeters = 3000;
   static const double _slowBeforeMeters = 2500;
@@ -30,6 +33,10 @@ class TrafficService {
     double corridorMeters = _corridorMeters,
   }) {
     if (waypoints.length < 2) return const [];
+    final key = '${identityHashCode(waypoints)}|'
+        '${events.map((e) => e.id).join(',')}';
+    if (key == _cacheKey) return _cached;
+
     final cum = RouteGeometry.cumulativeDistances(waypoints);
     final total = cum.last;
     if (total <= 0) return const [];
@@ -68,6 +75,8 @@ class TrafficService {
         ));
       }
     }
+    _cacheKey = key;
+    _cached = segments;
     return segments;
   }
 
