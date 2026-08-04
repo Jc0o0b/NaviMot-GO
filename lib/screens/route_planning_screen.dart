@@ -363,7 +363,11 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                   child: FilledButton.icon(
                     onPressed: () =>
                         Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => NavigationScreen(route: route),
+                      builder: (_) => NavigationScreen(
+                        route: route,
+                        intermediateWaypoints:
+                            routeVM.intermediateWaypoints,
+                      ),
                     )),
                     icon: const Icon(Icons.navigation, size: 18),
                     label: const Text('Start'),
@@ -538,6 +542,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               itemCount: items.length,
               onReorderItem: (oldIndex, newIndex) {
                 final updated = List<Object>.from(items);
+                if (newIndex > oldIndex) newIndex--;
                 final moved = updated.removeAt(oldIndex);
                 updated.insert(newIndex, moved);
                 routeVM.setWaypointOrder(

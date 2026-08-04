@@ -12,12 +12,17 @@ import '../models/traffic_regulations.dart';
 import '../providers/settings_provider.dart';
 import '../services/location_service.dart';
 import '../services/navigation_service.dart';
-import '../widgets/road_view_2d.dart';
 
 class NavigationScreen extends StatefulWidget {
   final MotorcycleRoute route;
+  final List<LatLng> intermediateWaypoints;
   final TileProvider? tileProvider;
-  const NavigationScreen({super.key, required this.route, this.tileProvider});
+  const NavigationScreen({
+    super.key,
+    required this.route,
+    this.intermediateWaypoints = const [],
+    this.tileProvider,
+  });
 
   @override
   State<NavigationScreen> createState() => _NavigationScreenState();
@@ -39,7 +44,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   LatLng? _currentLocation;
   double _currentSpeed = 0;
-  double _heading = 0;
   int _currentStepIndex = 0;
   int _nextStepIndex = 1;
   double _distanceToNext = 0;
@@ -122,7 +126,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (pts.isEmpty) return;
     _simTimer?.cancel();
     _demoMode = true;
-    _simSpeedMs = 50 / 3.6;
+    _simSpeedMs = 80 / 3.6;
     final loc = _currentLocation ?? pts.first;
     setState(() {
       _currentLocation = loc;
@@ -130,7 +134,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     });
     _moveCameraTo(loc);
     _simTimer = Timer.periodic(
-      const Duration(seconds: 1),
+      const Duration(milliseconds: 120),
       (_) => _advanceSimulation(),
     );
     if (mounted) {
@@ -147,17 +151,15 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final pts = widget.route.waypoints;
     if (pts.length < 2) return;
     final total = _waypointCumulative.last;
-    _simAlong += _simSpeedMs;
+    _simAlong += _simSpeedMs * 0.12;
     if (_simAlong >= total) {
       _simAlong = total;
       _simTimer?.cancel();
     }
     final loc = _pointAtAlong(_simAlong);
-    final ahead = _pointAtAlong(min(_simAlong + 6, total));
     setState(() {
       _currentLocation = loc;
-      _currentSpeed = 50 + 5 * sin(_simAlong / 400);
-      _heading = _bearing(loc, ahead);
+      _currentSpeed = 80 + 6 * sin(_simAlong / 300);
       _updateProgress(loc);
     });
     _moveCameraTo(loc);
@@ -191,11 +193,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
     }
     final loc = LatLng(pos.latitude, pos.longitude);
     final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
-    final heading = pos.heading.isFinite ? pos.heading : 0.0;
     setState(() {
       _currentLocation = loc;
       _currentSpeed = speedMs > 0.4 ? speedMs * 3.6 : 0;
-      _heading = heading;
       _updateProgress(loc);
     });
     _moveCameraTo(loc);
@@ -263,43 +263,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void _moveCameraTo(LatLng loc) {
     if (!_mapReady) return;
     final now = DateTime.now();
-    if (now.difference(_lastCameraMove).inMilliseconds < 900) return;
+    if (now.difference(_lastCameraMove).inMilliseconds < 250) return;
     _lastCameraMove = now;
     try {
       _mapController.move(loc, max(_mapController.camera.zoom, 16));
     } catch (_) {}
-  }
-
-  List<LatLng> _remainingPath() {
-    final loc = _currentLocation;
-    final pts = widget.route.waypoints;
-    if (loc == null || pts.length < 2) return const [];
-    final seg = _nearestSegmentIndex(loc);
-    final projected = _projectOnSegment(loc, pts[seg], pts[seg + 1]);
-    final list = <LatLng>[projected];
-    final step = max(1, (pts.length - seg - 1) ~/ 70);
-    for (var i = seg + 1; i < pts.length; i += step) {
-      list.add(pts[i]);
-      if (list.length >= 70) break;
-    }
-    if (!identical(list.last, pts.last)) list.add(pts.last);
-    return list;
-  }
-
-  double _effectiveHeading() {
-    if (_heading != 0) return _heading;
-    final path = _remainingPath();
-    if (path.length > 1) return _bearing(path[0], path[1]);
-    return 0;
-  }
-
-  double _bearing(LatLng a, LatLng b) {
-    final la1 = a.latitude * pi / 180;
-    final la2 = b.latitude * pi / 180;
-    final dLon = (b.longitude - a.longitude) * pi / 180;
-    final y = sin(dLon) * cos(la2);
-    final x = cos(la1) * sin(la2) - sin(la1) * cos(la2) * cos(dLon);
-    return (atan2(y, x) * 180 / pi + 360) % 360;
   }
 
   @override
@@ -318,110 +286,117 @@ class _NavigationScreenState extends State<NavigationScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Column(
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter:
+                    _currentLocation ?? widget.route.waypoints.first,
+                initialZoom: 15,
+                onMapReady: () {
+                  _mapReady = true;
+                  final loc = _currentLocation;
+                  if (loc != null) {
+                    _moveCameraTo(loc);
+                  } else {
+                    try {
+                      _mapController.fitCamera(CameraFit.coordinates(
+                        coordinates: widget.route.waypoints,
+                        padding: const EdgeInsets.all(10),
+                      ));
+                    } catch (_) {}
+                  }
+                },
+              ),
               children: [
-                Container(
-                  height: 150,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFDCE7D0),
-                    border: Border(
-                      bottom: BorderSide(color: Colors.black12),
-                    ),
-                  ),
-                  child: RoadView2D(
-                    path: _remainingPath(),
-                    headingDeg: _effectiveHeading(),
-                  ),
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.motorcycle.routes',
+                  tileProvider:
+                      widget.tileProvider ?? NetworkTileProvider(),
                 ),
-                Expanded(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter:
-                          _currentLocation ?? widget.route.waypoints.first,
-                      initialZoom: 15,
-                      onMapReady: () {
-                        _mapReady = true;
-                        final loc = _currentLocation;
-                        if (loc != null) {
-                          _moveCameraTo(loc);
-                        } else {
-                          try {
-                            _mapController.fitCamera(CameraFit.coordinates(
-                              coordinates: widget.route.waypoints,
-                              padding: const EdgeInsets.all(10),
-                            ));
-                          } catch (_) {}
-                        }
-                      },
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.motorcycle.routes',
-                        tileProvider:
-                            widget.tileProvider ?? NetworkTileProvider(),
+                if (widget.route.waypoints.length > 1) ...[
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: widget.route.waypoints,
+                        color: Colors.white,
+                        strokeWidth: 6,
                       ),
-                      if (widget.route.waypoints.length > 1) ...[
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: widget.route.waypoints,
-                              color: Colors.white,
-                              strokeWidth: 6,
-                            ),
-                            Polyline(
-                              points: widget.route.waypoints,
-                              color: Colors.deepOrange,
-                              strokeWidth: 4,
-                            ),
-                          ],
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: widget.route.waypoints.first,
-                              width: 32,
-                              height: 32,
-                              child: const Icon(Icons.motorcycle,
-                                  color: Colors.green, size: 28),
-                            ),
-                            Marker(
-                              point: widget.route.waypoints.last,
-                              width: 32,
-                              height: 32,
-                              child: const Icon(Icons.flag,
-                                  color: Colors.red, size: 28),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (_currentLocation != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _currentLocation!,
-                              width: 30,
-                              height: 30,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Colors.white, width: 2),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                        color: Colors.black38, blurRadius: 4)
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      Polyline(
+                        points: widget.route.waypoints,
+                        color: Colors.deepOrange,
+                        strokeWidth: 4,
+                      ),
                     ],
                   ),
-                ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: widget.route.waypoints.first,
+                        width: 32,
+                        height: 32,
+                        child: const Icon(Icons.motorcycle,
+                            color: Colors.green, size: 28),
+                      ),
+                      Marker(
+                        point: widget.route.waypoints.last,
+                        width: 32,
+                        height: 32,
+                        child: const Icon(Icons.flag,
+                            color: Colors.red, size: 28),
+                      ),
+                    ],
+                  ),
+                  if (widget.intermediateWaypoints.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        for (final wp in widget.intermediateWaypoints)
+                          Marker(
+                            point: wp,
+                            width: 34,
+                            height: 34,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.blue, width: 2),
+                                boxShadow: const [
+                                  BoxShadow(
+                                      color: Colors.black38, blurRadius: 4),
+                                ],
+                              ),
+                              child:
+                                  const Icon(Icons.place, size: 18, color: Colors.blue),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+                if (_currentLocation != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _currentLocation!,
+                        width: 40,
+                        height: 40,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.deepOrange, width: 2.5),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black45, blurRadius: 5),
+                            ],
+                          ),
+                          child: const Icon(Icons.motorcycle,
+                              color: Colors.deepOrange, size: 22),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -691,54 +666,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
       }
     }
     return bestAlong;
-  }
-
-  int _nearestSegmentIndex(LatLng p) {
-    final pts = widget.route.waypoints;
-    const scale = 111320.0;
-    final cosLat = cos(p.latitude * pi / 180);
-    var best = double.infinity;
-    var bestIdx = 0;
-    for (var i = 0; i < pts.length - 1; i++) {
-      final a = pts[i];
-      final b = pts[i + 1];
-      final ax = a.longitude * cosLat * scale;
-      final ay = a.latitude * scale;
-      final bx = b.longitude * cosLat * scale;
-      final by = b.latitude * scale;
-      final px = p.longitude * cosLat * scale;
-      final py = p.latitude * scale;
-      final dx = bx - ax;
-      final dy = by - ay;
-      final len2 = dx * dx + dy * dy;
-      var t = len2 == 0 ? 0.0 : ((px - ax) * dx + (py - ay) * dy) / len2;
-      t = t.clamp(0.0, 1.0);
-      final cx = ax + t * dx;
-      final cy = ay + t * dy;
-      final perp = sqrt(pow(px - cx, 2) + pow(py - cy, 2));
-      if (perp < best) {
-        best = perp;
-        bestIdx = i;
-      }
-    }
-    return bestIdx;
-  }
-
-  LatLng _projectOnSegment(LatLng p, LatLng a, LatLng b) {
-    const scale = 111320.0;
-    final cosLat = cos(p.latitude * pi / 180);
-    final ax = a.longitude * cosLat * scale;
-    final ay = a.latitude * scale;
-    final bx = b.longitude * cosLat * scale;
-    final by = b.latitude * scale;
-    final px = p.longitude * cosLat * scale;
-    final py = p.latitude * scale;
-    final dx = bx - ax;
-    final dy = by - ay;
-    final len2 = dx * dx + dy * dy;
-    var t = len2 == 0 ? 0.0 : ((px - ax) * dx + (py - ay) * dy) / len2;
-    t = t.clamp(0.0, 1.0);
-    return LatLng((ay + t * dy) / scale, (ax + t * dx) / (scale * cosLat));
   }
 
   List<double> _cumulativeDistances(List<LatLng> pts) {

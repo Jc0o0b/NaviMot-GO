@@ -488,7 +488,11 @@ class _SummaryOverlay extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: () =>
                         Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => NavigationScreen(route: route),
+                      builder: (_) => NavigationScreen(
+                        route: route,
+                        intermediateWaypoints:
+                            routeVM.intermediateWaypoints,
+                      ),
                     )),
                     icon: const Icon(Icons.navigation, size: 20),
                     label: const Text('Start nawigacji'),

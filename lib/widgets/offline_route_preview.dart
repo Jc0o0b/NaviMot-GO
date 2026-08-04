@@ -25,6 +25,7 @@ class OfflineRoutePreview extends StatelessWidget {
         size: Size.infinite,
         painter: _RoutePreviewPainter(
           waypoints: route.waypoints,
+          intermediateWaypoints: route.intermediateWaypoints,
           events: events,
           places: places,
         ),
@@ -35,11 +36,13 @@ class OfflineRoutePreview extends StatelessWidget {
 
 class _RoutePreviewPainter extends CustomPainter {
   final List<LatLng> waypoints;
+  final List<LatLng> intermediateWaypoints;
   final List<RoadEvent> events;
   final List<ImportantPlace> places;
 
   _RoutePreviewPainter({
     required this.waypoints,
+    this.intermediateWaypoints = const [],
     this.events = const [],
     this.places = const [],
   });
@@ -116,6 +119,26 @@ class _RoutePreviewPainter extends CustomPainter {
       ..lineTo(end.dx + 5, end.dy - 2)
       ..lineTo(end.dx, end.dy);
     canvas.drawPath(flag, Paint()..color = Colors.red.shade700);
+
+    for (var i = 0; i < intermediateWaypoints.length; i++) {
+      final p = intermediateWaypoints[i];
+      if (_inside(p, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
+        final o = project(p);
+        canvas.drawCircle(o, 9, Paint()..color = Colors.white);
+        canvas.drawCircle(o, 6.5, Paint()..color = Colors.blue.shade600);
+        final numTp = TextPainter(
+          text: TextSpan(
+            text: '${i + 1}',
+            style: const TextStyle(
+                fontSize: 8,
+                color: Colors.white,
+                fontWeight: FontWeight.bold),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        numTp.paint(canvas, o - Offset(numTp.width / 2, numTp.height / 2));
+      }
+    }
 
     for (final e in events) {
       final p = LatLng(e.lat, e.lon);
@@ -203,6 +226,7 @@ class _RoutePreviewPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _RoutePreviewPainter oldDelegate) =>
       oldDelegate.waypoints != waypoints ||
+      oldDelegate.intermediateWaypoints != intermediateWaypoints ||
       oldDelegate.events != events ||
       oldDelegate.places != places;
 }

@@ -10,6 +10,7 @@ class MotorcycleRoute {
   final int scenicScore;
   final List<RoadType> roadTypes;
   final List<RouteStep> steps;
+  final List<LatLng> intermediateWaypoints;
   final String? label;
 
   MotorcycleRoute({
@@ -21,6 +22,7 @@ class MotorcycleRoute {
     required this.scenicScore,
     required this.roadTypes,
     this.steps = const [],
+    this.intermediateWaypoints = const [],
     this.label,
   });
 
@@ -50,6 +52,9 @@ class MotorcycleRoute {
     'scenicScore': scenicScore,
     'roadTypes': roadTypes.map((t) => t.name).toList(),
     'steps': steps.map((s) => s.toJson()).toList(),
+    'intermediateWaypoints': intermediateWaypoints
+        .map((p) => {'lat': p.latitude, 'lon': p.longitude})
+        .toList(),
     'label': label,
   };
 
@@ -78,6 +83,12 @@ class MotorcycleRoute {
           .toList(),
       steps: (json['steps'] as List? ?? [])
           .map((s) => RouteStep.fromJson(s as Map<String, dynamic>))
+          .toList(),
+      intermediateWaypoints: (json['intermediateWaypoints'] as List? ?? [])
+          .map((w) => LatLng(
+                (w['lat'] as num).toDouble(),
+                (w['lon'] as num).toDouble(),
+              ))
           .toList(),
       label: json['label'] as String?,
     );

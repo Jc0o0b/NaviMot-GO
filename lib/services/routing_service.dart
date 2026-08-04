@@ -22,6 +22,7 @@ class RoutingService {
     required LatLng start,
     required LatLng end,
     List<LatLng> waypoints = const [],
+    List<LatLng> intermediateWaypoints = const [],
     bool avoidHighways = true,
     String? label,
   }) async {
@@ -38,12 +39,14 @@ class RoutingService {
     if (response.statusCode != 200) throw Exception('OSRM error: ${response.statusCode}');
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return _parseOSRMResponse(json, allCoords, label: label);
+    return _parseOSRMResponse(json, allCoords,
+        intermediateWaypoints: intermediateWaypoints, label: label);
   }
 
   MotorcycleRoute _parseOSRMResponse(
     Map<String, dynamic> json,
     List<LatLng> waypoints, {
+    List<LatLng> intermediateWaypoints = const [],
     String? label,
   }) {
     final routes = json['routes'] as List?;
@@ -82,6 +85,7 @@ class RoutingService {
       scenicScore: scenicScore,
       roadTypes: roadTypes,
       steps: steps,
+      intermediateWaypoints: intermediateWaypoints,
       label: label,
     );
   }
@@ -91,12 +95,14 @@ class RoutingService {
     required LatLng end,
     List<LatLng> waypoints = const [],
     List<LatLng>? scenicWaypoints,
+    List<LatLng> intermediateWaypoints = const [],
   }) async {
     final results = await Future.wait([
       calculateRoute(
         start: start,
         end: end,
         waypoints: scenicWaypoints ?? waypoints,
+        intermediateWaypoints: intermediateWaypoints,
         avoidHighways: true,
         label: 'Malownicza',
       ),
@@ -104,6 +110,7 @@ class RoutingService {
         start: start,
         end: end,
         waypoints: waypoints,
+        intermediateWaypoints: intermediateWaypoints,
         avoidHighways: false,
         label: 'Najszybsza',
       ),

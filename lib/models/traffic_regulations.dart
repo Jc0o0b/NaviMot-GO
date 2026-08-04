@@ -46,7 +46,7 @@ class PolishTrafficRegulations {
     }
 
     final hours = drivingSeconds / 3600.0;
-    final breakMinutes = (hours / 2.0).floor().clamp(0, 100) * 15;
+    final breakMinutes = hours.floor().clamp(0, 100) * 10;
     final breakSeconds = breakMinutes * 60.0;
 
     return TravelTimeInfo(

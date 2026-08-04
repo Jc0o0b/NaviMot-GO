@@ -102,6 +102,38 @@ void main() {
     );
   });
 
+  test('Czas jazdy z przerwami jest dłuższy niż sam czas jazdy', () {
+    final travel = PolishTrafficRegulations.shared.calculateTravelTime(
+      120000,
+      const [RoadType.national],
+    );
+    expect(travel.totalTime, greaterThan(travel.drivingTime));
+    expect(travel.breakTime, greaterThan(0));
+  });
+
+  test('MotorcycleRoute zapisuje i odtwarza przystanki pośrednie', () {
+    final route = MotorcycleRoute(
+      id: 'r2',
+      waypoints: const [
+        LatLng(52.1, 21.0),
+        LatLng(52.2, 21.1),
+        LatLng(52.3, 21.2),
+      ],
+      name: 'Trasa z przystankami',
+      totalDistance: 30000,
+      estimatedDuration: 1800,
+      scenicScore: 60,
+      roadTypes: const [RoadType.local],
+      intermediateWaypoints: const [
+        LatLng(52.2, 21.1),
+      ],
+    );
+    final restored = MotorcycleRoute.fromJson(route.toJson());
+    expect(restored.intermediateWaypoints.length, 1);
+    expect(restored.intermediateWaypoints.single.latitude, 52.2);
+    expect(restored.intermediateWaypoints.single.longitude, 21.1);
+  });
+
   test('MotorcycleRoute zachowuje etykietę trasy (wariant)', () {
     final route = MotorcycleRoute(
       id: 'r1',

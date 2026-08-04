@@ -84,6 +84,7 @@ class RouteProvider extends ChangeNotifier {
           start: start,
           end: end,
           waypoints: scenicWaypoints,
+          intermediateWaypoints: plainWaypoints,
           avoidHighways: true,
         );
         final detour = ScenicRouteCalculator.shared.suggestScenicDetour(tempRoute);
@@ -95,6 +96,7 @@ class RouteProvider extends ChangeNotifier {
         end: end,
         waypoints: plainWaypoints,
         scenicWaypoints: scenicWaypoints,
+        intermediateWaypoints: plainWaypoints,
       );
 
       _routeAlternatives = alternatives;
