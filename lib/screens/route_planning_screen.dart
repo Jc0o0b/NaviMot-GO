@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/route.dart';
+import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
 import '../services/geocoding_service.dart';
+import '../utils/route_proximity.dart';
 import '../widgets/home_sheet.dart';
 import '../widgets/section_header.dart';
 import 'navigation_screen.dart';
@@ -43,8 +45,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<RouteProvider, WeatherProvider>(
-      builder: (context, routeVM, weatherVM, _) {
+    return Consumer3<RouteProvider, WeatherProvider, EventsProvider>(
+      builder: (context, routeVM, weatherVM, eventsVM, _) {
         final route = routeVM.currentRoute;
         if (route != null && route.id != _loadedRouteId) {
           _loadedRouteId = route.id;
@@ -176,7 +178,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                       ],
                       if (routeVM.currentRoute != null) ...[
                         const SizedBox(height: 24),
-                        _buildConfirmation(routeVM),
+                        _buildConfirmation(routeVM, eventsVM),
                       ],
                     ],
                   ),
@@ -328,8 +330,14 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     );
   }
 
-  Widget _buildConfirmation(RouteProvider routeVM) {
+  Widget _buildConfirmation(RouteProvider routeVM, EventsProvider eventsVM) {
     final route = routeVM.currentRoute!;
+    final nearPlaces = itemsWithinRoute(
+      eventsVM.importantPlaces,
+      route.waypoints,
+      5000,
+      (p) => LatLng(p.lat, p.lon),
+    );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -387,6 +395,57 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
+            if (nearPlaces.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Icon(Icons.star, color: Colors.amber, size: 20),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text('Ważne miejsca w pobliżu trasy',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Miejsca zgłoszone przez innych użytkowników',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              for (final p in nearPlaces.take(5))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.star_border,
+                          size: 16, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.name,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            if (p.note.isNotEmpty)
+                              Text(p.note,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ],
         ),
       ),

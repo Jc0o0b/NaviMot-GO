@@ -40,6 +40,35 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Card(
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.volume_up_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Dźwięk',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Włącz dźwięk w aplikacji'),
+                      value: settings.audioEnabled,
+                      onChanged: (v) => settings.setAudioEnabled(v),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.record_voice_over_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Komunikaty głosowe',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle:
+                          const Text('Nawigacja odczytuje wskazówki na głos'),
+                      value: settings.voiceCommands,
+                      onChanged: settings.audioEnabled
+                          ? (v) => settings.setVoiceCommands(v)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 12),
@@ -88,17 +117,66 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => showHomeSheet(context),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Center(
-                child: Text(
-                  'NaviMot GO 1.0',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+              const SizedBox(height: 12),
+              Card(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    const Icon(Icons.motorcycle,
+                        size: 48, color: Colors.deepOrange),
+                    const SizedBox(height: 8),
+                    const Text('NaviMot GO',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
+                    const Text('Wersja 1.0.0',
+                        style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline,
+                          color: Colors.deepOrange),
+                      title: const Text('O aplikacji',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle:
+                          const Text('Co potrafi NaviMot GO i jak z niego korzystać'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _showAbout(context),
+                    ),
+                    const Divider(height: 1),
+                    const ListTile(
+                      leading: Icon(Icons.person_outline,
+                          color: Colors.deepOrange),
+                      title: Text('Twórca aplikacji',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text('Jc0o0b — pasjonat motocykli i programowania'),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           );
         },
       ),
+    );
+  }
+
+  void _showAbout(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'NaviMot GO',
+      applicationVersion: '1.0.0',
+      applicationIcon: const Icon(Icons.motorcycle,
+          size: 48, color: Colors.deepOrange),
+      applicationLegalese:
+          'Nawigacja i malownicze trasy motocyklowe z pogodą, miejscami dla motocyklisty, '
+          'wspólnotą i zgłoszeniami od społeczności.\n\n'
+          'Aplikacja została stworzona z myślą o motocyklistach, którzy lubią odkrywać '
+          'piękne drogi i dzielić się nimi z innymi.\n\nAutor: Jc0o0b',
+      children: const [
+        SizedBox(height: 8),
+        Text('NaviMot GO używa otwartych danych mapowych oraz usług wyznaczania tras.'),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:navimot_go/models/important_place.dart';
 import 'package:navimot_go/models/road_event.dart';
 import 'package:navimot_go/models/route.dart';
 import 'package:navimot_go/models/route_step.dart';
@@ -8,6 +9,8 @@ import 'package:navimot_go/providers/chat_provider.dart';
 import 'package:navimot_go/providers/events_provider.dart';
 import 'package:navimot_go/providers/route_provider.dart';
 import 'package:navimot_go/services/navigation_service.dart';
+import 'package:navimot_go/utils/gmx_builder.dart';
+import 'package:navimot_go/utils/route_proximity.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -168,5 +171,84 @@ void main() {
     provider.selectRoute(fastest);
     expect(provider.currentRoute?.id, 'fast');
     expect(provider.travelTimeInfo, isNotNull);
+  });
+
+  test('GmxExporter buduje poprawny plik GMX z trasą', () {
+    final route = MotorcycleRoute(
+      id: 'r1',
+      waypoints: const [
+        LatLng(52.2297, 21.0122),
+        LatLng(52.24, 21.05),
+        LatLng(50.0647, 19.9450),
+      ],
+      name: 'Warszawa <-> Kraków',
+      totalDistance: 293000,
+      estimatedDuration: 14400,
+      scenicScore: 85,
+      roadTypes: const [RoadType.highway],
+    );
+    final gmx = GmxBuilder.buildGmx(route);
+    expect(gmx, contains('<?xml version="1.0" encoding="UTF-8"?>'));
+    expect(gmx, contains('<rte>'));
+    expect(gmx, contains('<name>Warszawa &lt;-&gt; Kraków</name>'));
+    expect(gmx, contains('<rtept lat="52.2297" lon="21.0122">'));
+    expect(gmx, contains('<wpt'));
+    expect(gmx, contains('</gpx>'));
+  });
+
+  test('itemsWithinRoute filtruje punkty blisko trasy', () {
+    final waypoints = [
+      const LatLng(52.1, 21.0),
+      const LatLng(52.2, 21.1),
+    ];
+    final events = [
+      RoadEvent(
+        id: 'e1',
+        type: RoadEventType.accident,
+        lat: 52.15,
+        lon: 21.05,
+        createdAt: DateTime(2025),
+      ),
+      RoadEvent(
+        id: 'e2',
+        type: RoadEventType.police,
+        lat: 53.0,
+        lon: 22.0,
+        createdAt: DateTime(2025),
+      ),
+    ];
+    final near = itemsWithinRoute(
+        events, waypoints, 3000, (e) => LatLng(e.lat, e.lon));
+    expect(near.length, 1);
+    expect(near.first.id, 'e1');
+  });
+
+  test('Itemy ważnych miejsc są znajdowane w pobliżu trasy', () {
+    final waypoints = [
+      const LatLng(52.1, 21.0),
+      const LatLng(52.2, 21.1),
+    ];
+    final places = [
+      ImportantPlace(
+        id: 'p1',
+        name: 'Panorama',
+        note: 'Piękny widok',
+        lat: 52.15,
+        lon: 21.05,
+        createdAt: DateTime(2025),
+      ),
+      ImportantPlace(
+        id: 'p2',
+        name: 'Daleko',
+        note: '',
+        lat: 55.0,
+        lon: 25.0,
+        createdAt: DateTime(2025),
+      ),
+    ];
+    final near = itemsWithinRoute(
+        places, waypoints, 3000, (p) => LatLng(p.lat, p.lon));
+    expect(near.length, 1);
+    expect(near.first.name, 'Panorama');
   });
 }

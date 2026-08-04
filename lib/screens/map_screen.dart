@@ -14,6 +14,7 @@ import '../providers/poi_provider.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/weather_icon.dart';
 import '../widgets/poi_marker.dart';
+import '../utils/route_proximity.dart';
 import 'navigation_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -374,8 +375,19 @@ class _EventMarkersLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final eventsVM = context.watch<EventsProvider>();
+    final route = context.watch<RouteProvider>().currentRoute;
+
+    var events = eventsVM.events;
+    var places = eventsVM.importantPlaces;
+    if (route != null && route.waypoints.isNotEmpty) {
+      events = itemsWithinRoute(
+          events, route.waypoints, 3000, (e) => LatLng(e.lat, e.lon));
+      places = itemsWithinRoute(
+          places, route.waypoints, 3000, (p) => LatLng(p.lat, p.lon));
+    }
+
     final markers = <Marker>[
-      for (final e in eventsVM.events.take(60))
+      for (final e in events.take(60))
         Marker(
           point: LatLng(e.lat, e.lon),
           width: 36,
@@ -385,7 +397,7 @@ class _EventMarkersLayer extends StatelessWidget {
             child: RoadEventMarker(type: e.type),
           ),
         ),
-      for (final p in eventsVM.importantPlaces.take(40))
+      for (final p in places.take(40))
         Marker(
           point: LatLng(p.lat, p.lon),
           width: 40,
@@ -633,6 +645,47 @@ class _SummaryOverlay extends StatelessWidget {
   }
 
   Widget _buildAlternatives(RouteProvider routeVM) {
+    final alts = routeVM.routeAlternatives;
+    if (alts.length < 2) return const SizedBox.shrink();
+    final fastest = alts.firstWhere((a) => a.label == 'Najszybsza',
+        orElse: () => alts.last);
+    final scenic = alts.firstWhere((a) => a.label == 'Malownicza',
+        orElse: () => alts.first);
+
+    if (fastest.scenicScore >= scenic.scenicScore) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.green, width: 1),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Wyznaczona obecnie trasa jest najszybsza '
+                'i zarazem najbardziej malownicza',
+                style:
+                    TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final fastestTime = PolishTrafficRegulations.shared
+        .calculateTravelTime(fastest.totalDistance, fastest.roadTypes)
+        .drivingTime;
+    final scenicTime = PolishTrafficRegulations.shared
+        .calculateTravelTime(scenic.totalDistance, scenic.roadTypes)
+        .drivingTime;
+    final displayedFastest = min(fastestTime, scenicTime);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -645,6 +698,9 @@ class _SummaryOverlay extends StatelessWidget {
             child: _AlternativeTile(
               route: alt,
               selected: routeVM.currentRoute?.id == alt.id,
+              timeOverride: alt.label == 'Najszybsza'
+                  ? displayedFastest
+                  : null,
               onTap: () => routeVM.selectRoute(alt),
             ),
           ),
@@ -840,11 +896,13 @@ class _AlternativeTile extends StatelessWidget {
   final MotorcycleRoute route;
   final bool selected;
   final VoidCallback onTap;
+  final double? timeOverride;
 
   const _AlternativeTile({
     required this.route,
     required this.selected,
     required this.onTap,
+    this.timeOverride,
   });
 
   @override
@@ -852,6 +910,7 @@ class _AlternativeTile extends StatelessWidget {
     final fastest = route.label == 'Najszybsza';
     final travel = PolishTrafficRegulations.shared
         .calculateTravelTime(route.totalDistance, route.roadTypes);
+    final displaySeconds = timeOverride ?? travel.drivingTime;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -890,7 +949,7 @@ class _AlternativeTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${_formatDuration(travel.drivingTime)} · ${_formatDistance(route.totalDistance)}',
+                    '${_formatDuration(displaySeconds)} · ${_formatDistance(route.totalDistance)}',
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ],

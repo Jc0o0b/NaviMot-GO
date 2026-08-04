@@ -61,6 +61,7 @@ class NavimotGoApp extends StatelessWidget {
       brightness: Brightness.light,
       colorSchemeSeed: Colors.deepOrange,
       useMaterial3: true,
+      fontFamily: 'Montserrat',
     );
     return base.copyWith(
       scaffoldBackgroundColor: const Color(0xFFF7F2EA),
@@ -105,6 +106,7 @@ class NavimotGoApp extends StatelessWidget {
       brightness: Brightness.dark,
       colorSchemeSeed: Colors.deepOrange,
       useMaterial3: true,
+      fontFamily: 'Montserrat',
     );
     return base.copyWith(
       scaffoldBackgroundColor: const Color(0xFF131518),

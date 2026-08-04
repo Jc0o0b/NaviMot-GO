@@ -7,16 +7,22 @@ class SettingsProvider extends ChangeNotifier {
   static const String _homeKey = 'home_address';
   static const String _darkKey = 'dark_mode';
   static const String _nicknameKey = 'nickname';
+  static const String _audioKey = 'audio_enabled';
+  static const String _voiceKey = 'voice_commands';
 
   HomeAddress? _home;
   bool _loaded = false;
   bool _darkMode = false;
   String _nickname = 'Motocyklista';
+  bool _audioEnabled = true;
+  bool _voiceCommands = true;
 
   HomeAddress? get home => _home;
   bool get isLoaded => _loaded;
   bool get darkMode => _darkMode;
   String get nickname => _nickname;
+  bool get audioEnabled => _audioEnabled;
+  bool get voiceCommands => _voiceCommands;
 
   Future<void> load() async {
     try {
@@ -28,6 +34,8 @@ class SettingsProvider extends ChangeNotifier {
       }
       _darkMode = prefs.getBool(_darkKey) ?? false;
       _nickname = prefs.getString(_nicknameKey) ?? 'Motocyklista';
+      _audioEnabled = prefs.getBool(_audioKey) ?? true;
+      _voiceCommands = prefs.getBool(_voiceKey) ?? true;
     } catch (_) {
       _home = null;
     }
@@ -68,6 +76,24 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_nicknameKey, _nickname);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> setAudioEnabled(bool value) async {
+    _audioEnabled = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_audioKey, value);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> setVoiceCommands(bool value) async {
+    _voiceCommands = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_voiceKey, value);
     } catch (_) {}
     notifyListeners();
   }

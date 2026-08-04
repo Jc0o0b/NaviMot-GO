@@ -4,12 +4,14 @@ class SectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget>? actions;
+  final VoidCallback? onBack;
 
   const SectionHeader({
     super.key,
     required this.title,
     required this.icon,
     this.actions,
+    this.onBack,
   });
 
   @override
@@ -17,7 +19,7 @@ class SectionHeader extends StatelessWidget {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(16, topPad + 12, 8, 18),
+      padding: EdgeInsets.fromLTRB(8, topPad + 12, 8, 18),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -30,35 +32,65 @@ class SectionHeader extends StatelessWidget {
               color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 2)),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              child: onBack != null
+                  ? IconButton(
+                      onPressed: onBack,
+                      tooltip: 'Wróć',
+                      icon: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 26),
+                    )
+                  : null,
             ),
-            child: Icon(icon, color: Colors.white, size: 26),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
+            Expanded(
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          if (actions != null) ...[
-            const SizedBox(width: 4),
-            ...actions!,
+            SizedBox(
+              width: 48,
+              child: actions != null
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.max,
+                      children: actions!,
+                    )
+                  : null,
+            ),
           ],
-        ],
+        ),
       ),
     );
   }

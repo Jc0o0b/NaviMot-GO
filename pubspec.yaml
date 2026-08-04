@@ -28,3 +28,16 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/montserrat-v31-latin_latin-ext-regular.ttf
+          weight: 400
+        - asset: assets/fonts/montserrat-v31-latin_latin-ext-500.ttf
+          weight: 500
+        - asset: assets/fonts/montserrat-v31-latin_latin-ext-600.ttf
+          weight: 600
+        - asset: assets/fonts/montserrat-v31-latin_latin-ext-700.ttf
+          weight: 700
+        - asset: assets/fonts/montserrat-v31-latin_latin-ext-800.ttf
+          weight: 800

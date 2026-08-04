@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/route.dart';
+import '../models/traffic_regulations.dart';
+import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
+import '../utils/gmx_download.dart';
 import '../widgets/offline_route_preview.dart';
 import '../widgets/section_header.dart';
 
@@ -17,8 +20,11 @@ class SavedRoutesScreen extends StatelessWidget {
         return Scaffold(
           body: Column(
             children: [
-              const SectionHeader(
-                  title: 'Zapisane trasy', icon: Icons.bookmark),
+              SectionHeader(
+                title: 'Zapisane trasy',
+                icon: Icons.bookmark,
+                onBack: () => Navigator.of(context).pop(),
+              ),
               Expanded(
                 child: routeVM.savedRoutes.isEmpty
                     ? Center(
@@ -58,6 +64,10 @@ class SavedRoutesScreen extends StatelessWidget {
             ? Colors.orange
             : Colors.grey;
 
+    final travelTime = PolishTrafficRegulations.shared
+        .calculateTravelTime(route.totalDistance, route.roadTypes)
+        .drivingTime;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
@@ -84,7 +94,7 @@ class SavedRoutesScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 const Icon(Icons.schedule, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(_formatDuration(route.estimatedDuration),
+                Text(_formatDuration(travelTime),
                     style: const TextStyle(fontSize: 12)),
               ],
             ),
@@ -108,7 +118,21 @@ class SavedRoutesScreen extends StatelessWidget {
             ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Udostępnij jako plik GMX',
+              icon: const Icon(Icons.ios_share, size: 20),
+              onPressed: () => _exportRoute(context, route),
+            ),
+            IconButton(
+              tooltip: 'Usuń trasę',
+              icon: const Icon(Icons.delete_outline, size: 20),
+              onPressed: () => _confirmDelete(context, routeVM, route),
+            ),
+          ],
+        ),
         onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -116,6 +140,41 @@ class SavedRoutesScreen extends StatelessWidget {
             )),
       ),
     );
+  }
+
+  void _exportRoute(BuildContext context, MotorcycleRoute route) {
+    downloadGmx(route);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Pobrano plik GMX: ${route.name}.gmx')),
+    );
+  }
+
+  Future<void> _confirmDelete(
+      BuildContext context, RouteProvider routeVM, MotorcycleRoute route) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Usunąć trasę?'),
+        content: Text('Czy na pewno chcesz usunąć trasę „${route.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Usuń'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      routeVM.deleteRoute(route);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Trasa została usunięta')),
+      );
+    }
   }
 
   String _formatDistance(double meters) {
@@ -154,6 +213,7 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
       appBar: AppBar(title: Text(widget.route.name)),
       body: Consumer2<WeatherProvider, POIProvider>(
         builder: (context, weatherVM, poiVM, _) {
+          final eventsVM = context.watch<EventsProvider>();
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -163,7 +223,11 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    OfflineRoutePreview(route: widget.route),
+                    OfflineRoutePreview(
+                      route: widget.route,
+                      events: eventsVM.events,
+                      places: eventsVM.importantPlaces,
+                    ),
                     Positioned(
                       top: 4,
                       right: 4,
@@ -214,7 +278,12 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
                           const SizedBox(width: 8),
                           _statBox(
                               Icons.schedule,
-                              _formatDuration(widget.route.estimatedDuration),
+                              _formatDuration(
+                                  PolishTrafficRegulations.shared
+                                      .calculateTravelTime(
+                                          widget.route.totalDistance,
+                                          widget.route.roadTypes)
+                                      .drivingTime),
                               'Czas'),
                           const SizedBox(width: 8),
                           _statBox(Icons.star, '${widget.route.scenicScore}',

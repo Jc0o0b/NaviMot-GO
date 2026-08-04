@@ -5,9 +5,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
 import '../models/traffic_regulations.dart';
+import '../providers/settings_provider.dart';
 import '../services/location_service.dart';
 import '../services/navigation_service.dart';
 import '../widgets/road_view_2d.dart';
@@ -261,6 +263,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _speak(String text) async {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    if (!settings.audioEnabled || !settings.voiceCommands) return;
     try {
       await _tts?.stop();
       await _tts?.speak(text);

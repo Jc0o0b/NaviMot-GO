@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
+import '../models/important_place.dart';
+import '../models/road_event.dart';
 import '../models/route.dart';
+import '../widgets/event_widgets.dart' show eventIcon;
 
 class OfflineRoutePreview extends StatelessWidget {
   final MotorcycleRoute route;
+  final List<RoadEvent> events;
+  final List<ImportantPlace> places;
 
-  const OfflineRoutePreview({super.key, required this.route});
+  const OfflineRoutePreview({
+    super.key,
+    required this.route,
+    this.events = const [],
+    this.places = const [],
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +23,11 @@ class OfflineRoutePreview extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: CustomPaint(
         size: Size.infinite,
-        painter: _RoutePreviewPainter(waypoints: route.waypoints),
+        painter: _RoutePreviewPainter(
+          waypoints: route.waypoints,
+          events: events,
+          places: places,
+        ),
       ),
     );
   }
@@ -21,8 +35,14 @@ class OfflineRoutePreview extends StatelessWidget {
 
 class _RoutePreviewPainter extends CustomPainter {
   final List<LatLng> waypoints;
+  final List<RoadEvent> events;
+  final List<ImportantPlace> places;
 
-  _RoutePreviewPainter({required this.waypoints});
+  _RoutePreviewPainter({
+    required this.waypoints,
+    this.events = const [],
+    this.places = const [],
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -97,6 +117,33 @@ class _RoutePreviewPainter extends CustomPainter {
       ..lineTo(end.dx, end.dy);
     canvas.drawPath(flag, Paint()..color = Colors.red.shade700);
 
+    for (final e in events) {
+      final p = LatLng(e.lat, e.lon);
+      if (_inside(p, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
+        final o = project(p);
+        _paintBadge(
+          canvas,
+          o,
+          color: _eventColor(e.type),
+          icon: eventIcon(e.type),
+          size: 14,
+        );
+      }
+    }
+
+    for (final p in places) {
+      final pos = LatLng(p.lat, p.lon);
+      if (_inside(pos, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
+        _paintBadge(
+          canvas,
+          project(pos),
+          color: const Color(0xFFFFB300),
+          icon: Icons.star,
+          size: 14,
+        );
+      }
+    }
+
     final label = TextPainter(
       text: const TextSpan(
         text: 'Podgląd trasy (offline)',
@@ -107,7 +154,55 @@ class _RoutePreviewPainter extends CustomPainter {
     label.paint(canvas, Offset(10, 8));
   }
 
+  bool _inside(LatLng p, double minLat, double maxLat, double minLon,
+      double maxLon, double latSpan, double lonSpan) {
+    if (latSpan > 0 && (p.latitude < minLat || p.latitude > maxLat)) {
+      return false;
+    }
+    if (lonSpan > 0 && (p.longitude < minLon || p.longitude > maxLon)) {
+      return false;
+    }
+    return true;
+  }
+
+  Color _eventColor(RoadEventType type) {
+    switch (type) {
+      case RoadEventType.police:
+        return Colors.blue;
+      case RoadEventType.speedCamera:
+        return Colors.red;
+      case RoadEventType.accident:
+        return Colors.deepOrange;
+      case RoadEventType.obstacle:
+        return Colors.orange;
+      case RoadEventType.breakdown:
+        return Colors.brown;
+    }
+  }
+
+  void _paintBadge(Canvas canvas, Offset center,
+      {required Color color, required IconData icon, required double size}) {
+    final bg = Paint()..color = Colors.white;
+    canvas.drawCircle(center, size / 2 + 2, bg);
+    canvas.drawCircle(center, size / 2, Paint()..color = color);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: size - 3,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
+  }
+
   @override
   bool shouldRepaint(covariant _RoutePreviewPainter oldDelegate) =>
-      oldDelegate.waypoints != waypoints;
+      oldDelegate.waypoints != waypoints ||
+      oldDelegate.events != events ||
+      oldDelegate.places != places;
 }
