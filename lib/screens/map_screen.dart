@@ -141,8 +141,8 @@ class _MapScreenState extends State<MapScreen>
           ],
         ),
         Positioned(
-          top: MediaQuery.of(context).padding.top + 8,
-          right: 12,
+          left: 12,
+          bottom: 12,
           child: FloatingActionButton.small(
             heroTag: 'report-event',
             tooltip: 'Zgłoś wydarzenie na drodze',
@@ -469,7 +469,7 @@ class _SummaryOverlay extends StatelessWidget {
     return Positioned(
       left: 8,
       right: 8,
-      bottom: 0,
+      bottom: 60,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

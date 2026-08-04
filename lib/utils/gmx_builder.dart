@@ -37,6 +37,12 @@ class GmxBuilder {
     return buf.toString();
   }
 
+  static String linkUri(MotorcycleRoute route) {
+    final content = buildGmx(route);
+    return 'data:application/gpx+xml;charset=utf-8,'
+        '${Uri.encodeComponent(content)}';
+  }
+
   static String _waypoint(LatLng p, String name) {
     return '  <wpt lat="${p.latitude}" lon="${p.longitude}">'
         '<name>$name</name></wpt>';

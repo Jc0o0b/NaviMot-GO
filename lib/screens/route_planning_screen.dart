@@ -8,6 +8,7 @@ import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
 import '../services/geocoding_service.dart';
+import '../services/location_service.dart';
 import '../utils/route_proximity.dart';
 import '../widgets/home_sheet.dart';
 import '../widgets/section_header.dart';
@@ -72,12 +73,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                     color: Colors.white,
                     onPressed: _showHomeSheet,
                   ),
-                  TextButton.icon(
-                    onPressed: () => routeVM.useCurrentLocation(),
-                    icon: const Icon(Icons.gps_fixed, size: 18),
-                    label: const Text('GPS'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.white),
-                  ),
                 ],
               ),
               Expanded(
@@ -86,6 +81,18 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      OutlinedButton.icon(
+                        onPressed: _useCurrentLocation,
+                        icon: const Icon(Icons.gps_fixed, size: 18),
+                        label: const Text('Aktualna lokalizacja'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.deepOrange,
+                          side: const BorderSide(
+                              color: Colors.deepOrange, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _buildLocationField(
                         controller: _startController,
                         icon: Icons.motorcycle,
@@ -474,6 +481,87 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     showHomeSheet(context);
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pobieranie lokalizacji...'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    final location = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    if (location == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nie udało się pobrać lokalizacji'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    final routeVM = context.read<RouteProvider>();
+    final choice = await showDialog<_LocTarget>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Dodaj aktualną lokalizację'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_LocTarget.start),
+            child: const Row(
+              children: [
+                Icon(Icons.motorcycle, color: Colors.green, size: 20),
+                SizedBox(width: 12),
+                Text('Miejsce startu'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_LocTarget.end),
+            child: const Row(
+              children: [
+                Icon(Icons.flag, color: Colors.red, size: 20),
+                SizedBox(width: 12),
+                Text('Miejsce docelowe'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(_LocTarget.waypoint),
+            child: const Row(
+              children: [
+                Icon(Icons.add_location_alt_outlined,
+                    color: Colors.blue, size: 20),
+                SizedBox(width: 12),
+                Text('Przystanek po drodze'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    const label = 'Aktualna lokalizacja';
+    switch (choice) {
+      case _LocTarget.start:
+        routeVM.setStartLocation(location);
+        _startController.text = label;
+        break;
+      case _LocTarget.end:
+        routeVM.setEndLocation(location);
+        _endController.text = label;
+        break;
+      case _LocTarget.waypoint:
+        routeVM.addWaypoint(location);
+        break;
+    }
+    setState(() {
+      _startResults = [];
+      _endResults = [];
+      _waypointResults = [];
+    });
+  }
+
   void _onSearchChanged(TextEditingController controller, String query) {
     _debounce?.cancel();
     final seq = ++_searchSequence;
@@ -591,6 +679,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
 class _DestinationStop {
   const _DestinationStop();
 }
+
+enum _LocTarget { start, end, waypoint }
 
 class _StopTile extends StatelessWidget {
   final int? index;

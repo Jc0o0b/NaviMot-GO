@@ -38,6 +38,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
   double _simAlong = 0;
   double _simSpeedMs = 0;
 
+  static const double _routeSnapMeters = 2000;
+
   late final List<double> _waypointCumulative;
   late final List<double> _stepCumulative;
   late final double _totalDistance;
@@ -96,8 +98,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
       location = await LocationService.getCurrentLocation();
     } catch (_) {}
     if (location != null && mounted) {
-      setState(() => _currentLocation = location);
-      _moveCameraTo(location);
+      _handleInitialPosition(location);
     }
     bool streamOk = false;
     try {
@@ -115,19 +116,34 @@ class _NavigationScreenState extends State<NavigationScreen> {
     }
   }
 
+  void _handleInitialPosition(LatLng location) {
+    final snapped = _snapToRoute(location);
+    final realToRoute = _distanceBetween(location, snapped);
+    if (realToRoute <= _routeSnapMeters) {
+      setState(() {
+        _currentLocation = snapped;
+        _simAlong = _distanceAlong(snapped);
+      });
+      _moveCameraTo(snapped);
+    } else {
+      _startSimulation(
+          notice: 'Twoja pozycja jest daleko od trasy — uruchomiono podgląd');
+    }
+  }
+
   void _maybeEnterDemo() {
     if (mounted && _currentLocation == null && !_demoMode) {
       _startSimulation();
     }
   }
 
-  void _startSimulation() {
+  void _startSimulation({String? notice}) {
     final pts = widget.route.waypoints;
     if (pts.isEmpty) return;
     _simTimer?.cancel();
     _demoMode = true;
     _simSpeedMs = 80 / 3.6;
-    final loc = _currentLocation ?? pts.first;
+    final loc = _snapToRoute(_currentLocation ?? pts.first);
     setState(() {
       _currentLocation = loc;
       _simAlong = _waypointCumulative.length > 1 ? _distanceAlong(loc) : 0;
@@ -139,9 +155,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Brak sygnału GPS — uruchomiono tryb demo'),
-          duration: Duration(seconds: 3),
+        SnackBar(
+          content: Text(notice ?? 'Brak sygnału GPS — uruchomiono tryb demo'),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -187,18 +203,37 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   void _onPosition(Position pos) {
     if (!mounted) return;
+    final real = LatLng(pos.latitude, pos.longitude);
+    final snapped = _snapToRoute(real);
+    final realToRoute = _distanceBetween(real, snapped);
+    final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
+    if (realToRoute > _routeSnapMeters) return;
     if (_demoMode) {
       _simTimer?.cancel();
       _demoMode = false;
     }
-    final loc = LatLng(pos.latitude, pos.longitude);
-    final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
     setState(() {
-      _currentLocation = loc;
+      _currentLocation = snapped;
       _currentSpeed = speedMs > 0.4 ? speedMs * 3.6 : 0;
-      _updateProgress(loc);
+      _updateProgress(snapped);
     });
-    _moveCameraTo(loc);
+    _moveCameraTo(snapped);
+  }
+
+  LatLng _snapToRoute(LatLng p) {
+    if (widget.route.waypoints.length < 2) return p;
+    return _pointAtAlong(_distanceAlong(p));
+  }
+
+  double _distanceBetween(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final dLat = (b.latitude - a.latitude) * pi / 180;
+    final dLon = (b.longitude - a.longitude) * pi / 180;
+    final la1 = a.latitude * pi / 180;
+    final la2 = b.latitude * pi / 180;
+    final h =
+        pow(sin(dLat / 2), 2) + cos(la1) * cos(la2) * pow(sin(dLon / 2), 2);
+    return 2 * r * asin(sqrt(h));
   }
 
   void _updateProgress(LatLng loc) {

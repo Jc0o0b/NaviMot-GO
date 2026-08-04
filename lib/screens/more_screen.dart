@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/section_header.dart';
-import 'saved_routes_screen.dart';
+import 'chat_screen.dart';
 import 'settings_screen.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -26,16 +26,15 @@ class MoreScreen extends StatelessWidget {
                         color: Colors.orange.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.bookmark,
+                      child: const Icon(Icons.forum,
                           color: Colors.deepOrange, size: 22),
                     ),
-                    title: const Text('Zapisane trasy',
+                    title: const Text('Czat',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Twoje zapisane trasy offline'),
+                    subtitle: const Text('Czat motocyklistów'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const SavedRoutesScreen()),
+                      MaterialPageRoute(builder: (_) => const ChatScreen()),
                     ),
                   ),
                 ),

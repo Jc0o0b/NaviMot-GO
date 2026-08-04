@@ -3,7 +3,7 @@ import 'map_screen.dart';
 import 'route_planning_screen.dart';
 import 'weather_screen.dart';
 import 'poi_list_screen.dart';
-import 'chat_screen.dart';
+import 'saved_routes_screen.dart';
 import 'more_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
     RoutePlanningScreen(onRoutePlanned: () => setState(() => _selectedIndex = 0)),
     const WeatherScreen(),
     POIListScreen(onShowOnMap: () => setState(() => _selectedIndex = 0)),
-    const ChatScreen(),
+    const SavedRoutesScreen(),
     MoreScreen(onBackToMap: () => setState(() => _selectedIndex = 0)),
   ];
 
@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.route), label: 'Planuj'),
           NavigationDestination(icon: Icon(Icons.cloud), label: 'Pogoda'),
           NavigationDestination(icon: Icon(Icons.pin_drop), label: 'Miejsca'),
-          NavigationDestination(icon: Icon(Icons.forum), label: 'Czat'),
+          NavigationDestination(icon: Icon(Icons.bookmark), label: 'Zapisane'),
           NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Więcej'),
         ],
       ),

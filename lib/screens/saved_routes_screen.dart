@@ -23,7 +23,6 @@ class SavedRoutesScreen extends StatelessWidget {
               SectionHeader(
                 title: 'Zapisane trasy',
                 icon: Icons.bookmark,
-                onBack: () => Navigator.of(context).pop(),
               ),
               Expanded(
                 child: routeVM.savedRoutes.isEmpty
@@ -109,7 +108,7 @@ class SavedRoutesScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: 'Udostępnij jako plik GMX',
+              tooltip: 'Udostępnij trasę (GPX)',
               icon: const Icon(Icons.ios_share, size: 20),
               onPressed: () => _exportRoute(context, route),
             ),
@@ -129,11 +128,51 @@ class SavedRoutesScreen extends StatelessWidget {
     );
   }
 
-  void _exportRoute(BuildContext context, MotorcycleRoute route) {
-    downloadGmx(route);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Pobrano plik GMX: ${route.name}.gmx')),
+  Future<void> _exportRoute(
+      BuildContext context, MotorcycleRoute route) async {
+    final choice = await showModalBottomSheet<_GmxExportAction>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('Udostępnij trasę „${route.name}"'),
+              subtitle: const Text('Wybierz sposób udostępnienia pliku GPX'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.link, color: Colors.deepOrange),
+              title: const Text('Kopiuj link do trasy'),
+              subtitle: const Text('Odbiorca otworzy link w przeglądarce'),
+              onTap: () => Navigator.of(ctx).pop(_GmxExportAction.link),
+            ),
+            ListTile(
+              leading: const Icon(Icons.download, color: Colors.deepOrange),
+              title: const Text('Pobierz plik .gpx'),
+              subtitle: const Text('Zapisz plik i wyślij go np. e-mailem'),
+              onTap: () => Navigator.of(ctx).pop(_GmxExportAction.file),
+            ),
+          ],
+        ),
+      ),
     );
+    if (choice == null || !context.mounted) return;
+    switch (choice) {
+      case _GmxExportAction.link:
+        await copyGmxLink(route);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Link do trasy GPX skopiowany do schowka')),
+        );
+      case _GmxExportAction.file:
+        downloadGmx(route);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pobrano plik GPX: ${route.name}.gpx')),
+        );
+    }
   }
 
   Future<void> _confirmDelete(
@@ -175,6 +214,8 @@ class SavedRoutesScreen extends StatelessWidget {
     return h > 0 ? '${h}h ${m}min' : '${m} min';
   }
 }
+
+enum _GmxExportAction { link, file }
 
 class _RouteDetailScreen extends StatefulWidget {
   final MotorcycleRoute route;

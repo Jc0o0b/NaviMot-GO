@@ -1,4 +1,5 @@
 import 'dart:js_interop';
+import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 import '../models/route.dart';
 import 'gmx_builder.dart';
@@ -18,4 +19,10 @@ void downloadGmx(MotorcycleRoute route) {
   anchor.click();
   anchor.remove();
   web.URL.revokeObjectURL(url);
+}
+
+String gmxLinkUri(MotorcycleRoute route) => GmxBuilder.linkUri(route);
+
+Future<void> copyGmxLink(MotorcycleRoute route) async {
+  await Clipboard.setData(ClipboardData(text: gmxLinkUri(route)));
 }

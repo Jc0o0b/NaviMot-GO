@@ -15,8 +15,10 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       body: Column(
         children: [
-          const SectionHeader(
-              title: 'Czat motocyklistów', icon: Icons.forum),
+          SectionHeader(
+              title: 'Czat motocyklistów',
+              icon: Icons.forum,
+              onBack: () => Navigator.of(context).pop()),
           Expanded(
             child: ListView.builder(
               itemCount: voivodeships.length,
