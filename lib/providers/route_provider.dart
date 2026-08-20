@@ -25,6 +25,7 @@ class RouteProvider extends ChangeNotifier {
   LatLng? _startLocation;
   LatLng? _endLocation;
   List<LatLng> _intermediateWaypoints = [];
+  int _planGeneration = 0;
 
   RouteProvider() {
     _loadSavedRoutes();
@@ -74,6 +75,7 @@ class RouteProvider extends ChangeNotifier {
   }
 
   void planRoute(LatLng start, LatLng end) async {
+    final gen = ++_planGeneration;
     _isLoading = true;
     _errorMessage = null;
     _routeAlternatives = [];
@@ -92,6 +94,7 @@ class RouteProvider extends ChangeNotifier {
           intermediateWaypoints: plainWaypoints,
           avoidHighways: true,
         );
+        if (gen != _planGeneration) return;
         final detour = ScenicRouteCalculator.shared.suggestScenicDetour(tempRoute);
         if (detour != null) scenicWaypoints.addAll(detour);
       }
@@ -103,6 +106,7 @@ class RouteProvider extends ChangeNotifier {
         scenicWaypoints: scenicWaypoints,
         intermediateWaypoints: plainWaypoints,
       );
+      if (gen != _planGeneration) return;
 
       _routeAlternatives = alternatives;
       var chosen =
@@ -114,6 +118,7 @@ class RouteProvider extends ChangeNotifier {
           countryCode: skipCode,
           avoidHighways: _routeOptions.avoidHighways,
         );
+        if (gen != _planGeneration) return;
         if (avoided != null) chosen = avoided;
       }
       _currentRoute = chosen;
@@ -125,6 +130,7 @@ class RouteProvider extends ChangeNotifier {
       notifyListeners();
       _loadRouteCameras(chosen);
     } catch (e) {
+      if (gen != _planGeneration) return;
       _errorMessage = 'Nie udało się wyznaczyć trasy: $e';
       _isLoading = false;
       notifyListeners();
@@ -143,10 +149,12 @@ class RouteProvider extends ChangeNotifier {
   }
 
   Future<void> _loadRouteCameras(MotorcycleRoute route) async {
-    final cameras = await CameraService.shared.camerasForRoute(route.waypoints);
-    if (_currentRoute?.id != route.id) return;
-    _routeCameras = cameras;
-    notifyListeners();
+    try {
+      final cameras = await CameraService.shared.camerasForRoute(route.waypoints);
+      if (_currentRoute?.id != route.id) return;
+      _routeCameras = cameras;
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> useCurrentLocation() async {

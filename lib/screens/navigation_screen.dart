@@ -46,8 +46,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   double _simAlong = 0;
   double _simSpeedMs = 0;
 
-  static const double _routeSnapMeters = 2000;
-  static const double _rerouteThresholdMeters = 5000;
+  static const double _rerouteThresholdMeters = 200;
   static const Duration _rerouteCooldown = Duration(seconds: 30);
 
   /// Aktualna trasa (może być podmieniona po automatycznym objazdzie).
@@ -76,6 +75,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   double _upcomingAlertDistance = double.infinity;
   final Set<String> _spokenAlerts = {};
   DateTime _lastAlertCheck = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _ttsFailed = false;
 
   @override
   void initState() {
@@ -114,7 +114,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
         }
         _spokenStepIndex = 0;
       }
-    } catch (_) {}
+    } catch (e) {
+      _ttsFailed = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
+        ));
+      }
+    }
   }
 
   Future<void> _startTracking() async {
@@ -145,13 +154,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void _handleInitialPosition(LatLng location) {
     final snapped = _snapToRoute(location);
     final realToRoute = _distanceBetween(location, snapped);
-    if (realToRoute <= _routeSnapMeters) {
-      setState(() {
-        _currentLocation = snapped;
-        _simAlong = _distanceAlong(snapped);
-      });
-      _moveCameraTo(snapped);
-    } else {
+    setState(() {
+      _currentLocation = location;
+      _simAlong = _distanceAlong(snapped);
+    });
+    _moveCameraTo(location);
+    if (realToRoute > _rerouteThresholdMeters) {
       _maybeReroute(location, realToRoute);
     }
   }
@@ -232,20 +240,19 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final snapped = _snapToRoute(real);
     final realToRoute = _distanceBetween(real, snapped);
     final speedMs = pos.speed.isFinite ? pos.speed : 0.0;
-    if (realToRoute > _routeSnapMeters) {
-      _maybeReroute(real, realToRoute);
-      return;
-    }
     if (_demoMode) {
       _simTimer?.cancel();
       _demoMode = false;
     }
     setState(() {
-      _currentLocation = snapped;
+      _currentLocation = real;
       _currentSpeed = speedMs > 0.4 ? speedMs * 3.6 : 0;
       _updateProgress(snapped);
     });
-    _moveCameraTo(snapped);
+    _moveCameraTo(real);
+    if (realToRoute > _rerouteThresholdMeters) {
+      _maybeReroute(real, realToRoute);
+    }
   }
 
   LatLng _snapToRoute(LatLng p) {
@@ -383,10 +390,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (!mounted) return;
     if (result == null ||
         result.waypoints.length < 2 ||
-        _distanceBetween(origin, result.waypoints.first) > 2000) {
+        _distanceBetween(origin, result.waypoints.first) > 3000) {
       _maybeRerouteFailed();
       return;
     }
+    final snappedOrigin = _snapToRoute(origin);
     setState(() {
       _route = result;
       _recomputeRouteCache();
@@ -394,16 +402,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
       _spokenAlerts.clear();
       _currentStepIndex = 0;
       _nextStepIndex = _nextMeaningfulStepIndex();
-      _simAlong = _distanceAlong(_currentLocation ?? origin);
-      _currentLocation = _snapToRoute(origin);
+      _simAlong = _distanceAlong(snappedOrigin);
+      _currentLocation = origin;
       _remainingDistance = _totalDistance;
       _remainingDuration = PolishTrafficRegulations.shared
           .calculateTravelTime(_route.totalDistance, _route.roadTypes)
           .drivingTime;
-      _updateProgress(_currentLocation!);
+      _updateProgress(snappedOrigin);
       _rerouting = false;
     });
-    _moveCameraTo(_currentLocation!);
+    _moveCameraTo(origin);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('Wyznaczono objazd — zmieniono trasę'),
       duration: Duration(seconds: 3),
@@ -421,6 +429,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _speak(String text) async {
     if (!mounted) return;
+    if (_tts == null) return;
     final settings = context.read<SettingsProvider>();
     if (!settings.audioEnabled || !settings.voiceCommands) return;
     try {
@@ -432,7 +441,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void _moveCameraTo(LatLng loc) {
     if (!_mapReady) return;
     final now = DateTime.now();
-    if (now.difference(_lastCameraMove).inMilliseconds < 250) return;
+    if (now.difference(_lastCameraMove).inMilliseconds < 80) return;
     _lastCameraMove = now;
     try {
       _mapController.move(loc, max(_mapController.camera.zoom, 16));
@@ -803,6 +812,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     const Text('Tryb demo',
                         style:
                             TextStyle(fontSize: 10, color: Colors.deepOrange)),
+                  if (_ttsFailed)
+                    const Text('TTS niedostępne',
+                        style:
+                            TextStyle(fontSize: 10, color: Colors.red)),
                 ],
               ),
             ),
