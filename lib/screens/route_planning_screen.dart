@@ -86,7 +86,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 10 : 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

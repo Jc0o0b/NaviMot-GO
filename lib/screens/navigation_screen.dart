@@ -858,59 +858,66 @@ class _NavigationScreenState extends State<NavigationScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('${_currentSpeed.round()} km/h',
-                      style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.deepOrange)),
-                  const Text('Prędkość',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  if (_demoMode)
-                    const Text('Tryb demo',
-                        style:
-                            TextStyle(fontSize: 10, color: Colors.deepOrange)),
-                  if (_ttsFailed)
-                    const Text('TTS niedostępne',
-                        style:
-                            TextStyle(fontSize: 10, color: Colors.red)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Zostało $distText',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
-                  Text(timeText,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text(arrivalText,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.deepOrange,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
-              label: const Text('Zakończ'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+        child: Builder(
+          builder: (context) {
+            final w = MediaQuery.sizeOf(context).width;
+            final speedSize = w < 360 ? 20.0 : 26.0;
+            final distSize = w < 360 ? 14.0 : 18.0;
+            return Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${_currentSpeed.round()} km/h',
+                          style: TextStyle(
+                              fontSize: speedSize,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepOrange)),
+                      const Text('Prędkość',
+                          style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      if (_demoMode)
+                        const Text('Tryb demo',
+                            style:
+                                TextStyle(fontSize: 10, color: Colors.deepOrange)),
+                      if (_ttsFailed)
+                        const Text('TTS niedostępne',
+                            style:
+                                TextStyle(fontSize: 10, color: Colors.red)),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Zostało $distText',
+                          style: TextStyle(
+                              fontSize: distSize, fontWeight: FontWeight.bold)),
+                      Text(timeText,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(arrivalText,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.deepOrange,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                  label: const Text('Zakończ'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

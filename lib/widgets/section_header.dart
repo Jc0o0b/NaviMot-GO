@@ -17,6 +17,8 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+    final w = MediaQuery.sizeOf(context).width;
+    final titleSize = w < 360 ? 18.0 : 22.0;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(8, topPad + 12, 8, 18),
@@ -67,9 +69,9 @@ class SectionHeader extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: titleSize,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.2,
                         ),

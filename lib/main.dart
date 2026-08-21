@@ -84,7 +84,7 @@ class NavimotGoApp extends StatelessWidget {
         indicatorColor: const Color(0x33FF5722),
         elevation: 8,
         labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(
@@ -129,7 +129,7 @@ class NavimotGoApp extends StatelessWidget {
         indicatorColor: const Color(0x55FF5722),
         elevation: 8,
         labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(

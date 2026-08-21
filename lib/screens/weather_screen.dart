@@ -78,8 +78,9 @@ class WeatherScreen extends StatelessWidget {
                 size: 64, color: _weatherColor(condition)),
             const SizedBox(height: 8),
             Text('${weatherVM.averageTemperature.toInt()}°C',
-                style:
-                    const TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: MediaQuery.sizeOf(context).width < 360 ? 28 : 36,
+                    fontWeight: FontWeight.bold)),
             Text(_conditionName(condition),
                 style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 12),
