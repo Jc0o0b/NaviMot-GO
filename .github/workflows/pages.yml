@@ -23,6 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -33,6 +39,14 @@ jobs:
 
       - name: Build web
         run: flutter build web --release --base-href=/${{ github.event.repository.name }}/
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Prepare deployment files
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk build/web/app-release.apk
+          cp version.json build/web/version.json
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
