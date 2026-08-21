@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:web/web.dart' as web;
+import 'web_utils_stub.dart' if (dart.library.js_interop) 'web_utils_web.dart';
 import 'providers/route_provider.dart';
 import 'providers/weather_provider.dart';
 import 'providers/poi_provider.dart';
@@ -34,7 +34,7 @@ Future<void> main() async {
 
 void _removeWebSplash() {
   if (!kIsWeb) return;
-  web.document.getElementById('app-splash')?.remove();
+  removeWebSplash();
 }
 
 class NavimotGoApp extends StatelessWidget {
