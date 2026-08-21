@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -17,6 +18,7 @@ import '../services/location_service.dart';
 import '../services/navigation_service.dart';
 import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
+import '../services/web_tts_service.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/traffic_overlay.dart';
@@ -47,7 +49,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   double _simSpeedMs = 0;
 
   static const double _rerouteThresholdMeters = 200;
-  static const Duration _rerouteCooldown = Duration(seconds: 30);
+  static const Duration _rerouteCooldown = Duration(seconds: 10);
 
   /// Aktualna trasa (może być podmieniona po automatycznym objazdzie).
   late MotorcycleRoute _route;
@@ -101,28 +103,42 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _initTts() async {
-    try {
-      final tts = FlutterTts();
-      await tts.setLanguage('pl-PL');
-      await tts.setSpeechRate(0.48);
-      await tts.setVolume(1.0);
-      _tts = tts;
-      if (mounted && _route.steps.isNotEmpty) {
-        final first = _route.steps.first;
-        if (NavigationService.shared.shouldSpeak(first)) {
-          _speak(NavigationService.shared.instructionFor(first));
+    if (kIsWeb) {
+      await WebTtsService.shared.init();
+      if (!WebTtsService.shared.isSupported) {
+        _ttsFailed = true;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+            duration: Duration(seconds: 5),
+          ));
         }
-        _spokenStepIndex = 0;
+        return;
       }
-    } catch (e) {
-      _ttsFailed = true;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(label: 'OK', onPressed: () {}),
-        ));
+    } else {
+      try {
+        final tts = FlutterTts();
+        await tts.setLanguage('pl-PL');
+        await tts.setSpeechRate(0.48);
+        await tts.setVolume(1.0);
+        _tts = tts;
+      } catch (e) {
+        _ttsFailed = true;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+            duration: const Duration(seconds: 5),
+          ));
+        }
+        return;
       }
+    }
+    if (mounted && _route.steps.isNotEmpty) {
+      final first = _route.steps.first;
+      if (NavigationService.shared.shouldSpeak(first)) {
+        _speak(NavigationService.shared.instructionFor(first));
+      }
+      _spokenStepIndex = 0;
     }
   }
 
@@ -429,13 +445,17 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _speak(String text) async {
     if (!mounted) return;
-    if (_tts == null) return;
     final settings = context.read<SettingsProvider>();
     if (!settings.audioEnabled || !settings.voiceCommands) return;
-    try {
-      await _tts?.stop();
-      await _tts?.speak(text);
-    } catch (_) {}
+    if (kIsWeb) {
+      await WebTtsService.shared.speak(text);
+    } else {
+      if (_tts == null) return;
+      try {
+        await _tts?.stop();
+        await _tts?.speak(text);
+      } catch (_) {}
+    }
   }
 
   void _moveCameraTo(LatLng loc) {
@@ -444,7 +464,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (now.difference(_lastCameraMove).inMilliseconds < 80) return;
     _lastCameraMove = now;
     try {
-      _mapController.move(loc, max(_mapController.camera.zoom, 16));
+      final zoom = max(_mapController.camera.zoom, 16.0);
+      const metersPerDegLat = 111320.0;
+      final visibleMetersH = 156543.0 * pow(2, -zoom).toDouble();
+      final offsetMeters = visibleMetersH * 0.28;
+      final offsetLat = offsetMeters / metersPerDegLat;
+      final center = LatLng(loc.latitude + offsetLat, loc.longitude);
+      _mapController.move(center, zoom);
     } catch (_) {}
   }
 
@@ -453,17 +479,23 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _positionSub?.cancel();
     _simTimer?.cancel();
     _simFallbackTimer?.cancel();
-    _tts?.stop();
+    if (kIsWeb) {
+      WebTtsService.shared.stop();
+    } else {
+      _tts?.stop();
+    }
     _mapController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final routeProvider = context.watch<RouteProvider>();
     final events = [
-      ...context.watch<RouteProvider>().routeCameras,
+      ...routeProvider.routeCameras,
       ...context.watch<EventsProvider>().events,
     ];
+    final speedLimits = routeProvider.routeSpeedLimits;
     final trafficSegments = TrafficService.shared
         .trafficAlongRoute(_route.waypoints, events);
     return Scaffold(
@@ -475,7 +507,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               options: MapOptions(
                 initialCenter:
                     _currentLocation ?? _route.waypoints.first,
-                initialZoom: 15,
+                initialZoom: 16,
                 onMapReady: () {
                   _mapReady = true;
                   final loc = _currentLocation;
@@ -485,7 +517,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     try {
                       _mapController.fitCamera(CameraFit.coordinates(
                         coordinates: _route.waypoints,
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.fromLTRB(40, 80, 40, 160),
                       ));
                     } catch (_) {}
                   }
@@ -546,6 +578,38 @@ class _NavigationScreenState extends State<NavigationScreen> {
                               ),
                               child: Icon(eventIcon(e.type),
                                   size: 16, color: roadEventColor(e.type)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  if (speedLimits.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        for (final sl in speedLimits)
+                          Marker(
+                            point: sl.nearestPoint,
+                            width: 36,
+                            height: 36,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.red, width: 2.5),
+                                boxShadow: const [
+                                  BoxShadow(
+                                      color: Colors.black26, blurRadius: 3),
+                                ],
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${sl.limit}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
                             ),
                           ),
                       ],

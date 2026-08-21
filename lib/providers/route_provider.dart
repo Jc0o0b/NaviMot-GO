@@ -9,6 +9,7 @@ import '../models/traffic_regulations.dart';
 import '../services/camera_service.dart';
 import '../services/routing_service.dart';
 import '../services/location_service.dart';
+import '../services/speed_limit_service.dart';
 import '../utils/scenic_route_calculator.dart';
 
 class RouteProvider extends ChangeNotifier {
@@ -21,6 +22,7 @@ class RouteProvider extends ChangeNotifier {
   List<MotorcycleRoute> _savedRoutes = [];
   List<MotorcycleRoute> _routeAlternatives = [];
   List<RoadEvent> _routeCameras = [];
+  List<SpeedLimitSegment> _routeSpeedLimits = [];
   TravelTimeInfo? _travelTimeInfo;
   LatLng? _startLocation;
   LatLng? _endLocation;
@@ -38,6 +40,7 @@ class RouteProvider extends ChangeNotifier {
   List<MotorcycleRoute> get savedRoutes => _savedRoutes;
   List<MotorcycleRoute> get routeAlternatives => List.unmodifiable(_routeAlternatives);
   List<RoadEvent> get routeCameras => List.unmodifiable(_routeCameras);
+  List<SpeedLimitSegment> get routeSpeedLimits => List.unmodifiable(_routeSpeedLimits);
   TravelTimeInfo? get travelTimeInfo => _travelTimeInfo;
   LatLng? get startLocation => _startLocation;
   LatLng? get endLocation => _endLocation;
@@ -80,6 +83,7 @@ class RouteProvider extends ChangeNotifier {
     _errorMessage = null;
     _routeAlternatives = [];
     _routeCameras = [];
+    _routeSpeedLimits = [];
     notifyListeners();
 
     try {
@@ -140,6 +144,7 @@ class RouteProvider extends ChangeNotifier {
   void selectRoute(MotorcycleRoute route) {
     _currentRoute = route;
     _routeCameras = [];
+    _routeSpeedLimits = [];
     _travelTimeInfo = PolishTrafficRegulations.shared.calculateTravelTime(
       route.totalDistance,
       route.roadTypes,
@@ -153,6 +158,12 @@ class RouteProvider extends ChangeNotifier {
       final cameras = await CameraService.shared.camerasForRoute(route.waypoints);
       if (_currentRoute?.id != route.id) return;
       _routeCameras = cameras;
+      notifyListeners();
+    } catch (_) {}
+    try {
+      final limits = await SpeedLimitService.shared.limitsForRoute(route.waypoints);
+      if (_currentRoute?.id != route.id) return;
+      _routeSpeedLimits = limits;
       notifyListeners();
     } catch (_) {}
   }

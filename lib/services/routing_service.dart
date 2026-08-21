@@ -17,7 +17,7 @@ class RoutingService {
 
   String _baseUrl(bool avoidHighways) {
     return avoidHighways
-        ? 'https://routing.openstreetmap.de/routed-bike/route/v1/cycling'
+        ? 'https://routing.openstreetmap.de/routed-car/route/v1/car'
         : 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
   }
 

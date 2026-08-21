@@ -407,6 +407,31 @@ class _EventMarkersLayer extends StatelessWidget {
             child: RoadEventMarker(type: e.type),
           ),
         ),
+      for (final sl in context.watch<RouteProvider>().routeSpeedLimits)
+        Marker(
+          point: sl.nearestPoint,
+          width: 36,
+          height: 36,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.red, width: 2.5),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 3),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${sl.limit}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ),
       for (final p in places.take(40))
         Marker(
           point: LatLng(p.lat, p.lon),
