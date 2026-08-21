@@ -27,32 +27,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    final compact = w < 380;
-    final destinations = compact
-        ? const [
-            NavigationDestination(icon: Icon(Icons.map), label: 'Mapa'),
-            NavigationDestination(icon: Icon(Icons.route), label: 'Plan'),
-            NavigationDestination(icon: Icon(Icons.cloud), label: 'Pogo'),
-            NavigationDestination(icon: Icon(Icons.pin_drop), label: 'Miej'),
-            NavigationDestination(icon: Icon(Icons.bookmark), label: 'Zapis'),
-            NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Inne'),
-          ]
-        : const [
-            NavigationDestination(icon: Icon(Icons.map), label: 'Mapa'),
-            NavigationDestination(icon: Icon(Icons.route), label: 'Planuj'),
-            NavigationDestination(icon: Icon(Icons.cloud), label: 'Pogoda'),
-            NavigationDestination(icon: Icon(Icons.pin_drop), label: 'Miejsca'),
-            NavigationDestination(icon: Icon(Icons.bookmark), label: 'Zapisane'),
-            NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Więcej'),
-          ];
     return Scaffold(
       body: _screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: destinations,
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.map), label: 'Mapa'),
+          NavigationDestination(icon: Icon(Icons.route), label: 'Planuj'),
+          NavigationDestination(icon: Icon(Icons.cloud), label: 'Pogoda'),
+          NavigationDestination(icon: Icon(Icons.pin_drop), label: 'Miejsca'),
+          NavigationDestination(icon: Icon(Icons.bookmark), label: 'Zapisane'),
+          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Więcej'),
+        ],
       ),
     );
   }

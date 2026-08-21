@@ -48,6 +48,7 @@ class _WebTtsImpl implements WebTtsService {
   SpeechSynthesis? _synth;
   bool _supported = false;
   bool _initialized = false;
+  String? lastError;
 
   @override
   bool get isSupported => _supported;
@@ -59,7 +60,8 @@ class _WebTtsImpl implements WebTtsService {
     try {
       _synth = _getSynth();
       _supported = true;
-    } catch (_) {
+    } catch (e) {
+      lastError = 'init: $e';
       _supported = false;
     }
   }
@@ -83,7 +85,10 @@ class _WebTtsImpl implements WebTtsService {
         }
       }
       _synth!.speak(u);
-    } catch (_) {}
+      lastError = null;
+    } catch (e) {
+      lastError = 'speak: $e';
+    }
   }
 
   @override

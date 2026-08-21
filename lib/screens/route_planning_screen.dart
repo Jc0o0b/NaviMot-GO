@@ -278,8 +278,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
         if (results.isEmpty && !loading && GeocodingService.shared.lastError != null && controller.text.length >= 3)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text('Błąd wyszukiwania. Sprawdź połączenie z internetem.',
-                style: TextStyle(fontSize: 12, color: Colors.red[400])),
+            child: Text('Błąd: ${GeocodingService.shared.lastError}',
+                style: TextStyle(fontSize: 11, color: Colors.red[400])),
           ),
         if (results.isNotEmpty)
           Container(

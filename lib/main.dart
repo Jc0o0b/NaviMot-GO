@@ -83,9 +83,11 @@ class NavimotGoApp extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0x33FF5722),
         elevation: 8,
+        height: 60,
         labelTextStyle: WidgetStateProperty.all(
           const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       cardTheme: CardThemeData(
         color: Colors.white,
@@ -128,9 +130,11 @@ class NavimotGoApp extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         indicatorColor: const Color(0x55FF5722),
         elevation: 8,
+        height: 60,
         labelTextStyle: WidgetStateProperty.all(
           const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
       cardTheme: CardThemeData(
         color: const Color(0xFF23262A),

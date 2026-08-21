@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "build_number": 2,
-  "changelog": "Nowa sekcja Aktualizacja w ustawieniach. Responsywny interfejs dla małych ekranów. Ulepszone wyszukiwanie adresów.",
+  "version": "1.2.0",
+  "build_number": 3,
+  "changelog": "Nominatim fallback dla wyszukiwania. Pełne etykiety nawigacji. Szczegółowe błędy wyszukiwania.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

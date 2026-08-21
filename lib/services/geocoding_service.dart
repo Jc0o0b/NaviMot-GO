@@ -26,12 +26,27 @@ class GeocodingService {
 
   Future<List<GeocodingResult>> search(String query, {int limit = 6}) async {
     if (query.length < 3) return [];
+    lastError = null;
+
+    var results = await _searchPhoton(query, limit);
+    if (results != null) return results;
+
+    results = await _searchNominatim(query, limit);
+    if (results != null) return results;
+
+    return [];
+  }
+
+  Future<List<GeocodingResult>?> _searchPhoton(
+      String query, int limit) async {
     try {
-      final uri = Uri.parse('https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&limit=$limit');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 8));
+      final uri = Uri.parse(
+          'https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&limit=$limit');
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 6));
       if (response.statusCode != 200) {
-        lastError = 'HTTP ${response.statusCode}';
-        return [];
+        lastError = 'Photon HTTP ${response.statusCode}';
+        return null;
       }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final features = data['features'] as List? ?? [];
@@ -49,11 +64,55 @@ class GeocodingService {
           lon: (coords[0] as num).toDouble(),
         ));
       }
+      if (results.isNotEmpty) {
+        lastError = null;
+        return results;
+      }
       lastError = null;
       return results;
     } catch (e) {
-      lastError = e.toString();
-      return [];
+      lastError = 'Photon: $e';
+      return null;
+    }
+  }
+
+  Future<List<GeocodingResult>?> _searchNominatim(
+      String query, int limit) async {
+    try {
+      final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=$limit&accept-language=pl');
+      final response = await _client
+          .get(uri, headers: {'User-Agent': 'NaviMotGO/1.1'})
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) {
+        lastError = 'Nominatim HTTP ${response.statusCode}';
+        return null;
+      }
+      final data = jsonDecode(response.body) as List;
+      final results = <GeocodingResult>[];
+      for (final item in data) {
+        final m = item as Map<String, dynamic>;
+        final lat = double.tryParse(m['lat']?.toString() ?? '');
+        final lon = double.tryParse(m['lon']?.toString() ?? '');
+        if (lat == null || lon == null) continue;
+        final displayName = m['display_name'] as String? ?? '';
+        final name = m['name'] as String? ?? '';
+        results.add(GeocodingResult(
+          displayName: displayName.isNotEmpty ? displayName : name,
+          shortName: name.isNotEmpty ? name : displayName,
+          lat: lat,
+          lon: lon,
+        ));
+      }
+      if (results.isNotEmpty) {
+        lastError = null;
+        return results;
+      }
+      lastError = null;
+      return results;
+    } catch (e) {
+      lastError = 'Nominatim: $e';
+      return null;
     }
   }
 
@@ -63,7 +122,9 @@ class GeocodingService {
     final street = props['street'];
     final housenumber = props['housenumber'];
     if (street is String && street.isNotEmpty) {
-      return housenumber is String && housenumber.isNotEmpty ? '$street $housenumber' : street;
+      return housenumber is String && housenumber.isNotEmpty
+          ? '$street $housenumber'
+          : street;
     }
     final city = props['city'];
     if (city is String && city.isNotEmpty) return city;
@@ -74,7 +135,14 @@ class GeocodingService {
 
   String _buildDisplayName(Map<String, dynamic> props) {
     final parts = <String>[_buildShortName(props)];
-    for (final key in ['street', 'housenumber', 'postcode', 'city', 'state', 'country']) {
+    for (final key in [
+      'street',
+      'housenumber',
+      'postcode',
+      'city',
+      'state',
+      'country'
+    ]) {
       final v = props[key];
       if (v is String && v.isNotEmpty && !parts.contains(v)) parts.add(v);
     }
