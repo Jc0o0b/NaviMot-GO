@@ -37,6 +37,9 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   List<GeocodingResult> _waypointResults = [];
   Timer? _debounce;
   int _searchSequence = 0;
+  bool _startLoading = false;
+  bool _endLoading = false;
+  bool _waypointLoading = false;
   String? _loadedRouteId;
   bool _navigateOnReady = false;
   bool _addingWaypoint = false;
@@ -105,6 +108,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         color: Colors.green,
                         hint: 'Wpisz miejsce startu...',
                         results: _startResults,
+                        loading: _startLoading,
                         onHomeTap: _useHomeAsStart,
                         onSelected: (loc) {
                           _startController.text = loc.displayName;
@@ -121,6 +125,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         color: Colors.red,
                         hint: 'Wpisz miejsce docelowe...',
                         results: _endResults,
+                        loading: _endLoading,
                         onHomeTap: _useHomeAsEnd,
                         onSelected: (loc) {
                           _endController.text = loc.displayName;
@@ -138,6 +143,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           color: Colors.blue,
                           hint: 'Wpisz przystanek po drodze...',
                           results: _waypointResults,
+                          loading: _waypointLoading,
                           onSelected: (loc) {
                             _waypointController.text = loc.displayName;
                             routeVM.addWaypoint(LatLng(loc.lat, loc.lon));
@@ -213,6 +219,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     required void Function(GeocodingResult) onSelected,
     required void Function(String) onChanged,
     VoidCallback? onHomeTap,
+    bool loading = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,16 +250,37 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
           decoration: InputDecoration(
             hintText: hint,
             border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                controller.clear();
-                onChanged('');
-              },
-            ),
+            suffixIcon: loading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      controller.clear();
+                      onChanged('');
+                    },
+                  ),
           ),
           onChanged: (q) => _onSearchChanged(controller, q),
         ),
+        if (results.isEmpty && loading && controller.text.length >= 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('Szukam...',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+          ),
+        if (results.isEmpty && !loading && GeocodingService.shared.lastError != null && controller.text.length >= 3)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('Błąd wyszukiwania. Sprawdź połączenie z internetem.',
+                style: TextStyle(fontSize: 12, color: Colors.red[400])),
+          ),
         if (results.isNotEmpty)
           Container(
             constraints: const BoxConstraints(maxHeight: 150),
@@ -750,10 +778,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       setState(() {
         if (controller == _startController) {
           _startResults = r;
+          _startLoading = false;
         } else if (controller == _endController) {
           _endResults = r;
+          _endLoading = false;
         } else {
           _waypointResults = r;
+          _waypointLoading = false;
         }
       });
     }
@@ -776,7 +807,16 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       updateResults([]);
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 600), () {
+    setState(() {
+      if (controller == _startController) {
+        _startLoading = true;
+      } else if (controller == _endController) {
+        _endLoading = true;
+      } else {
+        _waypointLoading = true;
+      }
+    });
+    _debounce = Timer(const Duration(milliseconds: 400), () {
       _searchLocation(query, updateResults);
     });
   }

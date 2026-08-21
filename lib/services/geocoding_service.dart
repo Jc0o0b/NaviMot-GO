@@ -22,12 +22,17 @@ class GeocodingService {
 
   final http.Client _client = http.Client();
 
+  String? lastError;
+
   Future<List<GeocodingResult>> search(String query, {int limit = 6}) async {
     if (query.length < 3) return [];
     try {
       final uri = Uri.parse('https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&limit=$limit');
-      final response = await _client.get(uri);
-      if (response.statusCode != 200) return [];
+      final response = await _client.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) {
+        lastError = 'HTTP ${response.statusCode}';
+        return [];
+      }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final features = data['features'] as List? ?? [];
       final results = <GeocodingResult>[];
@@ -44,8 +49,10 @@ class GeocodingService {
           lon: (coords[0] as num).toDouble(),
         ));
       }
+      lastError = null;
       return results;
-    } catch (_) {
+    } catch (e) {
+      lastError = e.toString();
       return [];
     }
   }
