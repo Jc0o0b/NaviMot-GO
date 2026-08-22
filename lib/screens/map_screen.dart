@@ -144,30 +144,10 @@ class _MapScreenState extends State<MapScreen>
             const RepaintBoundary(child: _EventMarkersLayer()),
           ],
         ),
-        if (route == null)
-          Positioned(
-            left: 12,
-            bottom: 12,
-            child: FloatingActionButton.small(
-              heroTag: 'report-event',
-              tooltip: 'Zgłoś wydarzenie na drodze',
-              backgroundColor: Colors.deepOrange,
-              foregroundColor: Colors.white,
-              onPressed: () => showEventReportSheet(
-                context,
-                fallbackLocation: _mapCenter,
-              ),
-              child: const Icon(Icons.warning_amber_rounded),
-            ),
-          ),
         if (route != null)
           _SummaryOverlay(
             route: route,
             poiVM: context.watch<POIProvider>(),
-            onReport: () => showEventReportSheet(
-              context,
-              fallbackLocation: _mapCenter,
-            ),
             onShowPois: () => _ensurePoisLoaded(route),
             onPoiSelected: (poi) {
               setState(() => _poisShownOnMap = true);
@@ -508,7 +488,6 @@ class _TrafficOverlayLayer extends StatelessWidget {
 class _SummaryOverlay extends StatelessWidget {
   final MotorcycleRoute route;
   final POIProvider poiVM;
-  final VoidCallback onReport;
   final VoidCallback onShowPois;
   final void Function(PointOfInterest) onPoiSelected;
   final void Function(BuildContext, RouteProvider, MotorcycleRoute) onSave;
@@ -516,7 +495,6 @@ class _SummaryOverlay extends StatelessWidget {
   const _SummaryOverlay({
     required this.route,
     required this.poiVM,
-    required this.onReport,
     required this.onShowPois,
     required this.onPoiSelected,
     required this.onSave,
@@ -542,15 +520,6 @@ class _SummaryOverlay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FloatingActionButton.small(
-            heroTag: 'report-event',
-            tooltip: 'Zgłoś wydarzenie na drodze',
-            backgroundColor: Colors.deepOrange,
-            foregroundColor: Colors.white,
-            onPressed: onReport,
-            child: const Icon(Icons.warning_amber_rounded),
-          ),
-          const SizedBox(height: 8),
           Card(
             margin: EdgeInsets.zero,
             elevation: 4,
@@ -700,30 +669,6 @@ class _SummaryOverlay extends StatelessWidget {
               ),
             ),
           ),
-          if (weatherVM.weatherAlert != null) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      color: Colors.amber, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(weatherVM.weatherAlert!,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

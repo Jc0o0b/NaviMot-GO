@@ -74,7 +74,7 @@ class WeatherProvider extends ChangeNotifier {
     wp.condition == WeatherCondition.snow);
 
   String? get weatherAlert {
-    if (hasRiskyWeather) return '⚠️ Na trasie występują niebezpieczne warunki pogodowe';
+    if (hasRiskyWeather) return 'Na trasie występują niebezpieczne warunki pogodowe';
     if (maxWindSpeed > 50) return '💨 Silny wiatr na trasie (${maxWindSpeed.toInt()} km/h)';
     if (maxPrecipitationProbability > 70) return '🌧️ Wysokie prawdopodobieństwo opadów (${maxPrecipitationProbability.toInt()}%)';
     return null;

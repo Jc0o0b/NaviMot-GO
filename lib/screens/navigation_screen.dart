@@ -111,7 +111,18 @@ class _NavigationScreenState extends State<NavigationScreen> {
         .fetchWeatherAlongRoute(_route.waypoints,
             startTime: DateTime.now())
         .then((points) {
-      if (mounted) setState(() => _routeWeather = points);
+      if (!mounted) return;
+      setState(() => _routeWeather = points);
+      final hasDanger = points.any((wp) =>
+          wp.condition == WeatherCondition.thunderstorm ||
+          wp.condition == WeatherCondition.heavyRain ||
+          wp.condition == WeatherCondition.snow);
+      if (hasDanger) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Na trasie występują niebezpieczne warunki pogodowe'),
+          duration: Duration(seconds: 4),
+        ));
+      }
     });
   }
 
@@ -905,7 +916,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
           if (!_arrived)
             Positioned(
               right: 12,
-              bottom: 90,
+              bottom: 160,
               child: FloatingActionButton.small(
                 heroTag: 'nav-report-event',
                 tooltip: 'Zgłoś wydarzenie na drodze',

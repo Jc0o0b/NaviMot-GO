@@ -14,6 +14,7 @@ import '../services/location_service.dart';
 import '../services/traffic_service.dart';
 import '../utils/route_proximity.dart';
 import '../widgets/event_widgets.dart';
+
 import '../widgets/home_sheet.dart';
 import '../widgets/offline_route_preview.dart';
 import '../widgets/section_header.dart';
@@ -561,21 +562,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: route.waypoints.isNotEmpty
-                  ? () => showEventReportSheet(
-                        context,
-                        fallbackLocation: route.waypoints.first,
-                      )
-                  : null,
-              icon: const Icon(Icons.warning_amber_rounded, size: 18),
-              label: const Text('Zgłoś zdarzenie na drodze'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.deepOrange,
-                side: const BorderSide(color: Colors.deepOrange),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
             if (nearEvents.isNotEmpty) ...[
               const SizedBox(height: 16),
               const Divider(height: 1),

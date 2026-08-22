@@ -47,7 +47,6 @@ extension type SpeechSynthesisVoice._(JSObject _) implements JSObject {
 class _WebTtsImpl implements WebTtsService {
   SpeechSynthesis? _synth;
   bool _supported = false;
-  bool _initialized = false;
   bool _activated = false;
   String? lastError;
 
@@ -59,10 +58,9 @@ class _WebTtsImpl implements WebTtsService {
 
   @override
   Future<void> init() async {
-    if (_initialized) return;
-    _initialized = true;
     try {
-      _synth = _getSynth();
+      final s = _getSynth();
+      _synth = s;
       _supported = true;
     } catch (e) {
       lastError = 'init: $e';
