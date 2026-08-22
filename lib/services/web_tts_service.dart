@@ -5,7 +5,9 @@ abstract class WebTtsService {
   static WebTtsService? _instance;
   static WebTtsService get shared => _instance ??= createWebTts();
   bool get isSupported;
+  bool get needsUserGesture;
   Future<void> init();
+  Future<void> activate();
   Future<void> speak(String text);
   Future<void> stop();
 }

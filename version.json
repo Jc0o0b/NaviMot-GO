@@ -1,6 +1,6 @@
 {
-  "version": "1.2.0",
-  "build_number": 3,
-  "changelog": "Nominatim fallback dla wyszukiwania. Pełne etykiety nawigacji. Szczegółowe błędy wyszukiwania.",
+  "version": "1.3.0",
+  "build_number": 4,
+  "changelog": "TTS aktywacja gestem uzytkownika. Wake Lock - ekran nie wygasa. Przycisk zgłoszeń w podglądzie trasy.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

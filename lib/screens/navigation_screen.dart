@@ -18,6 +18,7 @@ import '../services/location_service.dart';
 import '../services/navigation_service.dart';
 import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
+import '../services/wake_lock_service.dart';
 import '../services/web_tts_service.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
@@ -78,6 +79,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   final Set<String> _spokenAlerts = {};
   DateTime _lastAlertCheck = DateTime.fromMillisecondsSinceEpoch(0);
   bool _ttsFailed = false;
+  bool _ttsNeedsActivation = false;
 
   @override
   void initState() {
@@ -92,6 +94,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
         .drivingTime;
     _initTts();
     _startTracking();
+    _acquireWakeLock();
   }
 
   void _recomputeRouteCache() {
@@ -100,6 +103,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
         ? _waypointCumulative.last
         : _route.totalDistance;
     _stepCumulative = _computeStepCumulative(_route.steps);
+  }
+
+  Future<void> _acquireWakeLock() async {
+    try {
+      await WakeLockService.shared.acquire();
+    } catch (_) {}
   }
 
   Future<void> _initTts() async {
@@ -113,6 +122,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
             duration: Duration(seconds: 5),
           ));
         }
+        return;
+      }
+      if (WebTtsService.shared.needsUserGesture) {
+        setState(() => _ttsNeedsActivation = true);
         return;
       }
     } else {
@@ -133,12 +146,23 @@ class _NavigationScreenState extends State<NavigationScreen> {
         return;
       }
     }
-    if (mounted && _route.steps.isNotEmpty) {
-      final first = _route.steps.first;
-      if (NavigationService.shared.shouldSpeak(first)) {
-        _speak(NavigationService.shared.instructionFor(first));
-      }
-      _spokenStepIndex = 0;
+    _speakFirstInstruction();
+  }
+
+  void _speakFirstInstruction() {
+    if (!mounted || _route.steps.isEmpty) return;
+    final first = _route.steps.first;
+    if (NavigationService.shared.shouldSpeak(first)) {
+      _speak(NavigationService.shared.instructionFor(first));
+    }
+    _spokenStepIndex = 0;
+  }
+
+  Future<void> _activateTts() async {
+    if (kIsWeb) {
+      await WebTtsService.shared.activate();
+      setState(() => _ttsNeedsActivation = false);
+      _speakFirstInstruction();
     }
   }
 
@@ -484,6 +508,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     } else {
       _tts?.stop();
     }
+    WakeLockService.shared.release();
     _mapController.dispose();
     super.dispose();
   }
@@ -751,6 +776,58 @@ class _NavigationScreenState extends State<NavigationScreen> {
               left: 0,
               right: 0,
               child: _buildBottomBar(),
+            ),
+          if (_ttsNeedsActivation)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: _activateTts,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrange,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 6)
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.volume_up, color: Colors.white, size: 24),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Stuknij aby włączyć głos',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (!_arrived)
+            Positioned(
+              right: 12,
+              bottom: 90,
+              child: FloatingActionButton.small(
+                heroTag: 'nav-report-event',
+                tooltip: 'Zgłoś wydarzenie na drodze',
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white,
+                onPressed: () => showEventReportSheet(
+                  context,
+                  fallbackLocation: _currentLocation ?? _route.waypoints.first,
+                ),
+                child: const Icon(Icons.warning_amber_rounded),
+              ),
             ),
           if (_arrived) Positioned.fill(child: _buildArrivalOverlay()),
         ],

@@ -7,7 +7,13 @@ class _StubWebTts implements WebTtsService {
   bool get isSupported => false;
 
   @override
+  bool get needsUserGesture => false;
+
+  @override
   Future<void> init() async {}
+
+  @override
+  Future<void> activate() async {}
 
   @override
   Future<void> speak(String text) async {}

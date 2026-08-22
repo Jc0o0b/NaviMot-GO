@@ -48,10 +48,14 @@ class _WebTtsImpl implements WebTtsService {
   SpeechSynthesis? _synth;
   bool _supported = false;
   bool _initialized = false;
+  bool _activated = false;
   String? lastError;
 
   @override
   bool get isSupported => _supported;
+
+  @override
+  bool get needsUserGesture => _supported && !_activated;
 
   @override
   Future<void> init() async {
@@ -63,6 +67,24 @@ class _WebTtsImpl implements WebTtsService {
     } catch (e) {
       lastError = 'init: $e';
       _supported = false;
+    }
+  }
+
+  @override
+  Future<void> activate() async {
+    if (!_supported || _synth == null || _activated) return;
+    try {
+      _synth!.cancel();
+      final u = SpeechSynthesisUtterance();
+      u.text = ' ';
+      u.lang = 'pl-PL';
+      u.volume = 0.0;
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      _synth!.speak(u);
+      _activated = true;
+    } catch (e) {
+      lastError = 'activate: $e';
     }
   }
 
