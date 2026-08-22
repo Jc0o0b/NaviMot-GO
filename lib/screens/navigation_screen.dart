@@ -11,6 +11,7 @@ import '../models/road_event.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
 import '../models/traffic_regulations.dart';
+import '../models/weather_point.dart';
 import '../providers/events_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
@@ -19,6 +20,7 @@ import '../services/navigation_service.dart';
 import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
 import '../services/wake_lock_service.dart';
+import '../services/weather_service.dart';
 import '../services/web_tts_service.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
@@ -81,6 +83,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
   bool _ttsFailed = false;
   bool _ttsNeedsActivation = false;
 
+  double _heading = 0;
+  List<WeatherPoint> _routeWeather = [];
+  WeatherPoint? _upcomingRain;
+  double _upcomingRainDistance = double.infinity;
+  final Set<String> _spokenWeatherAlerts = {};
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +103,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _initTts();
     _startTracking();
     _acquireWakeLock();
+    _loadRouteWeather();
+  }
+
+  void _loadRouteWeather() {
+    WeatherService.shared
+        .fetchWeatherAlongRoute(_route.waypoints,
+            startTime: DateTime.now())
+        .then((points) {
+      if (mounted) setState(() => _routeWeather = points);
+    });
   }
 
   void _recomputeRouteCache() {
@@ -323,6 +341,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
         ? totalTravel * (_remainingDistance / _totalDistance)
         : 0;
     _updateAlert(along);
+    _checkWeatherAlert(loc, along);
     if (steps.isEmpty) return;
 
     var cs = 0;
@@ -397,6 +416,48 @@ class _NavigationScreenState extends State<NavigationScreen> {
     }
     if (nearestDist <= speakAt && _spokenAlerts.add(nearest.id)) {
       _speak(NavigationService.shared.alertFor(nearest, nearestDist.round()));
+    }
+  }
+
+  void _checkWeatherAlert(LatLng loc, double along) {
+    if (_routeWeather.isEmpty) return;
+    const rainConditions = {
+      WeatherCondition.rain,
+      WeatherCondition.heavyRain,
+      WeatherCondition.thunderstorm,
+      WeatherCondition.snow,
+    };
+    WeatherPoint? nearestRain;
+    var nearestDist = double.infinity;
+    for (final wp in _routeWeather) {
+      if (!rainConditions.contains(wp.condition) &&
+          wp.precipitationProbability < 50) continue;
+      final dist = _distanceAlong(wp.coordinate) - along;
+      if (dist < -200 || dist > 5000) continue;
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestRain = wp;
+      }
+    }
+    _upcomingRain = nearestRain;
+    _upcomingRainDistance =
+        nearestDist == double.infinity ? double.infinity : max(0.0, nearestDist);
+    if (nearestRain == null || nearestDist == double.infinity) return;
+    if (nearestDist > 2000) return;
+    final key =
+        '${nearestRain.coordinate.latitude.toStringAsFixed(3)}_${nearestRain.coordinate.longitude.toStringAsFixed(3)}';
+    if (_spokenWeatherAlerts.add(key)) {
+      final label = nearestRain.condition == WeatherCondition.heavyRain
+          ? 'ulewne deszcze'
+          : nearestRain.condition == WeatherCondition.thunderstorm
+              ? 'burze'
+              : nearestRain.condition == WeatherCondition.snow
+                  ? 'opady śniegu'
+                  : 'opady deszczu';
+      final prob = nearestRain.precipitationProbability.round();
+      _speak(
+          'Uwaga, za ${_formatDistance(nearestDist)} $label na trasie, '
+          'prawdopodobieństwo $prob procent');
     }
   }
 
@@ -489,13 +550,37 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _lastCameraMove = now;
     try {
       final zoom = max(_mapController.camera.zoom, 16.0);
+      final bearing = _computeBearing(loc);
       const metersPerDegLat = 111320.0;
       final visibleMetersH = 156543.0 * pow(2, -zoom).toDouble();
       final offsetMeters = visibleMetersH * 0.28;
       final offsetLat = offsetMeters / metersPerDegLat;
       final center = LatLng(loc.latitude + offsetLat, loc.longitude);
-      _mapController.move(center, zoom);
+      _mapController.moveAndRotate(center, zoom, bearing);
     } catch (_) {}
+  }
+
+  double _computeBearing(LatLng from) {
+    final steps = _route.steps;
+    if (steps.isEmpty || _nextStepIndex >= steps.length) return _heading;
+    final pts = _route.waypoints;
+    final targetIdx = (_nextStepIndex * pts.length / max(steps.length, 1))
+        .round()
+        .clamp(0, pts.length - 1);
+    final target = pts[targetIdx];
+    final dLon = (target.longitude - from.longitude) * pi / 180;
+    final la1 = from.latitude * pi / 180;
+    final la2 = target.latitude * pi / 180;
+    final y = sin(dLon) * cos(la2);
+    final x = cos(la1) * sin(la2) - sin(la1) * cos(la2) * cos(dLon);
+    final b = (atan2(y, x) * 180 / pi + 360) % 360;
+    final diff = (b - _heading).abs();
+    if (diff > 180) {
+      _heading = b;
+    } else if (diff > 3) {
+      _heading = b;
+    }
+    return _heading;
   }
 
   @override
@@ -742,6 +827,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     const SizedBox(height: 8),
                     _buildAlertBanner(),
                   ],
+                  if (_upcomingRain != null && !_rerouting) ...[
+                    const SizedBox(height: 8),
+                    _buildWeatherBanner(),
+                  ],
                 ],
               ),
             ),
@@ -897,6 +986,53 @@ class _NavigationScreenState extends State<NavigationScreen> {
             child: Text(
               '${e.type.label} — '
               '${_upcomingAlertDistance == double.infinity ? '?' : _formatDistance(_upcomingAlertDistance)}',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherBanner() {
+    final wp = _upcomingRain;
+    if (wp == null) return const SizedBox.shrink();
+    final hasRain = wp.condition == WeatherCondition.rain ||
+        wp.condition == WeatherCondition.heavyRain;
+    final hasStorm = wp.condition == WeatherCondition.thunderstorm;
+    final hasSnow = wp.condition == WeatherCondition.snow;
+    final color =
+        hasStorm ? Colors.purple[700]! : hasSnow ? Colors.blue[700]! : Colors.blue[600]!;
+    final icon =
+        hasStorm ? Icons.thunderstorm : hasSnow ? Icons.snowing : Icons.water_drop;
+    final label = hasStorm
+        ? 'Burza'
+        : hasSnow
+            ? 'Śnieg'
+            : hasRain
+                ? 'Deszcz'
+                : 'Opady';
+    final prob = wp.precipitationProbability.round();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$label za ${_formatDistance(_upcomingRainDistance)} '
+              '(${prob}%)',
               style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
