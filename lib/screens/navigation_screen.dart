@@ -21,7 +21,6 @@ import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
 import '../services/wake_lock_service.dart';
 import '../services/weather_service.dart';
-import '../services/web_tts_service.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/traffic_overlay.dart';
@@ -81,7 +80,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
   final Set<String> _spokenAlerts = {};
   DateTime _lastAlertCheck = DateTime.fromMillisecondsSinceEpoch(0);
   bool _ttsFailed = false;
-  bool _ttsNeedsActivation = false;
 
   double _heading = 0;
   List<WeatherPoint> _routeWeather = [];
@@ -141,39 +139,21 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _initTts() async {
-    if (kIsWeb) {
-      await WebTtsService.shared.init();
-      if (!WebTtsService.shared.isSupported) {
-        _ttsFailed = true;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-            duration: Duration(seconds: 5),
-          ));
-        }
-        return;
+    try {
+      final tts = FlutterTts();
+      await tts.setLanguage('pl-PL');
+      await tts.setSpeechRate(0.48);
+      await tts.setVolume(1.0);
+      _tts = tts;
+    } catch (e) {
+      _ttsFailed = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+          duration: const Duration(seconds: 5),
+        ));
       }
-      if (WebTtsService.shared.needsUserGesture) {
-        setState(() => _ttsNeedsActivation = true);
-        return;
-      }
-    } else {
-      try {
-        final tts = FlutterTts();
-        await tts.setLanguage('pl-PL');
-        await tts.setSpeechRate(0.48);
-        await tts.setVolume(1.0);
-        _tts = tts;
-      } catch (e) {
-        _ttsFailed = true;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-            duration: const Duration(seconds: 5),
-          ));
-        }
-        return;
-      }
+      return;
     }
     _speakFirstInstruction();
   }
@@ -188,11 +168,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _activateTts() async {
-    if (kIsWeb) {
-      await WebTtsService.shared.activate();
-      setState(() => _ttsNeedsActivation = false);
-      _speakFirstInstruction();
-    }
+    _speakFirstInstruction();
+    if (mounted) setState(() {});
   }
 
   Future<void> _startTracking() async {
@@ -540,18 +517,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _speak(String text) async {
-    if (!mounted) return;
+    if (!mounted || _tts == null) return;
     final settings = context.read<SettingsProvider>();
     if (!settings.audioEnabled || !settings.voiceCommands) return;
-    if (kIsWeb) {
-      await WebTtsService.shared.speak(text);
-    } else {
-      if (_tts == null) return;
-      try {
-        await _tts?.stop();
-        await _tts?.speak(text);
-      } catch (_) {}
-    }
+    try {
+      await _tts?.stop();
+      await _tts?.speak(text);
+    } catch (_) {}
   }
 
   void _moveCameraTo(LatLng loc) {
@@ -599,11 +571,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _positionSub?.cancel();
     _simTimer?.cancel();
     _simFallbackTimer?.cancel();
-    if (kIsWeb) {
-      WebTtsService.shared.stop();
-    } else {
-      _tts?.stop();
-    }
+    _tts?.stop();
     WakeLockService.shared.release();
     _mapController.dispose();
     super.dispose();
@@ -876,42 +844,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
               left: 0,
               right: 0,
               child: _buildBottomBar(),
-            ),
-          if (_ttsNeedsActivation)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 8,
-              left: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: _activateTts,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.deepOrange,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black26, blurRadius: 6)
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.volume_up, color: Colors.white, size: 24),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Stuknij aby włączyć głos',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           if (!_arrived)
             Positioned(
