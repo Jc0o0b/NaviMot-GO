@@ -21,6 +21,7 @@ import '../services/routing_service.dart';
 import '../services/traffic_service.dart';
 import '../services/wake_lock_service.dart';
 import '../services/weather_service.dart';
+import '../services/web_tts_service.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/traffic_overlay.dart';
@@ -139,21 +140,35 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _initTts() async {
-    try {
-      final tts = FlutterTts();
-      await tts.setLanguage('pl-PL');
-      await tts.setSpeechRate(0.48);
-      await tts.setVolume(1.0);
-      _tts = tts;
-    } catch (e) {
-      _ttsFailed = true;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-          duration: const Duration(seconds: 5),
-        ));
+    if (kIsWeb) {
+      await WebTtsService.shared.init();
+      if (!WebTtsService.shared.isSupported) {
+        _ttsFailed = true;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+            duration: Duration(seconds: 5),
+          ));
+        }
+        return;
       }
-      return;
+    } else {
+      try {
+        final tts = FlutterTts();
+        await tts.setLanguage('pl-PL');
+        await tts.setSpeechRate(0.48);
+        await tts.setVolume(1.0);
+        _tts = tts;
+      } catch (e) {
+        _ttsFailed = true;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+            duration: const Duration(seconds: 5),
+          ));
+        }
+        return;
+      }
     }
     _speakFirstInstruction();
   }
@@ -517,13 +532,18 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _speak(String text) async {
-    if (!mounted || _tts == null) return;
+    if (!mounted) return;
     final settings = context.read<SettingsProvider>();
     if (!settings.audioEnabled || !settings.voiceCommands) return;
-    try {
-      await _tts?.stop();
-      await _tts?.speak(text);
-    } catch (_) {}
+    if (kIsWeb) {
+      await WebTtsService.shared.speak(text);
+    } else {
+      if (_tts == null) return;
+      try {
+        await _tts?.stop();
+        await _tts?.speak(text);
+      } catch (_) {}
+    }
   }
 
   void _moveCameraTo(LatLng loc) {
@@ -571,7 +591,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _positionSub?.cancel();
     _simTimer?.cancel();
     _simFallbackTimer?.cancel();
-    _tts?.stop();
+    if (kIsWeb) {
+      WebTtsService.shared.stop();
+    } else {
+      _tts?.stop();
+    }
     WakeLockService.shared.release();
     _mapController.dispose();
     super.dispose();

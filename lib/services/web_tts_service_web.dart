@@ -6,7 +6,6 @@ import 'web_tts_service.dart';
 WebTtsService createWebTts() => _WebTtsImpl();
 
 class _WebTtsImpl implements WebTtsService {
-  web.SpeechSynthesis? _synth;
   bool _supported = false;
   bool _activated = false;
   String? lastError;
@@ -20,13 +19,18 @@ class _WebTtsImpl implements WebTtsService {
   @override
   Future<void> init() async {
     try {
-      _synth = web.window.speechSynthesis;
+      final synth = web.window.speechSynthesis;
+      _synth = synth;
       _supported = true;
+      print('[TTS] init OK, speechSynthesis found');
     } catch (e) {
       lastError = 'init: $e';
       _supported = false;
+      print('[TTS] init FAILED: $e');
     }
   }
+
+  web.SpeechSynthesis? _synth;
 
   @override
   Future<void> activate() async {
@@ -42,6 +46,7 @@ class _WebTtsImpl implements WebTtsService {
       _activated = true;
     } catch (e) {
       lastError = 'activate: $e';
+      print('[TTS] activate FAILED: $e');
     }
   }
 
@@ -56,9 +61,8 @@ class _WebTtsImpl implements WebTtsService {
       u.volume = 1.0;
       u.pitch = 1.0;
       try {
-        final voices = _synth!.getVoices();
-        for (var i = 0; i < voices.length; i++) {
-          final v = voices[i];
+        final voices = _synth!.getVoices().toDart;
+        for (final v in voices) {
           if (v.lang.toLowerCase().startsWith('pl')) {
             u.voice = v;
             break;
@@ -69,6 +73,7 @@ class _WebTtsImpl implements WebTtsService {
       lastError = null;
     } catch (e) {
       lastError = 'speak: $e';
+      print('[TTS] speak FAILED: $e');
     }
   }
 
