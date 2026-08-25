@@ -897,10 +897,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final step = steps[_nextStepIndex];
     final instruction = NavigationService.shared.instructionFor(step);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: Row(
@@ -939,10 +939,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (e == null) return const SizedBox.shrink();
     final color = roadEventColor(e.type);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: Row(
@@ -986,10 +986,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 : 'Opady';
     final prob = wp.precipitationProbability.round();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: Row(
@@ -1030,11 +1030,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
         '${arrival.minute.toString().padLeft(2, '0')}';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
       ),
       child: SafeArea(
         top: false,
@@ -1060,11 +1060,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       if (_demoMode)
                         const Text('Tryb demo',
                             style:
-                                TextStyle(fontSize: 10, color: Colors.deepOrange)),
+                                TextStyle(fontSize: 11, color: Colors.deepOrange)),
                       if (_ttsFailed)
                         const Text('TTS niedostępne',
                             style:
-                                TextStyle(fontSize: 10, color: Colors.red)),
+                                TextStyle(fontSize: 11, color: Colors.red)),
                     ],
                   ),
                 ),

@@ -90,6 +90,39 @@
       </svg>
       <div class="brand">NaviMot <span>GO</span></div>
     </div>
+    <script>
+      window.navimotTTS = {
+        synth: window.speechSynthesis || null,
+        _u: null,
+        init: function() {
+          if (!this.synth) return false;
+          try { this._u = new SpeechSynthesisUtterance(''); return true; }
+          catch(e) { return false; }
+        },
+        speak: function(text) {
+          if (!this.synth) return;
+          this.synth.cancel();
+          var u = new SpeechSynthesisUtterance(text);
+          u.lang = 'pl-PL';
+          u.rate = 1.0;
+          u.volume = 1.0;
+          u.pitch = 1.0;
+          try {
+            var voices = this.synth.getVoices();
+            for (var i = 0; i < voices.length; i++) {
+              if (voices[i].lang.toLowerCase().startsWith('pl')) {
+                u.voice = voices[i];
+                break;
+              }
+            }
+          } catch(e) {}
+          this.synth.speak(u);
+        },
+        stop: function() {
+          if (this.synth) this.synth.cancel();
+        }
+      };
+    </script>
     <script src="flutter.js" defer></script>
     <script src="flutter_bootstrap.js" async></script>
   </body>

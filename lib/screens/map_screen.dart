@@ -515,8 +515,8 @@ class _SummaryOverlay extends StatelessWidget {
     return Positioned(
       left: 8,
       right: 8,
-      bottom: 12,
-      child: Column(
+        bottom: 16,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -525,9 +525,9 @@ class _SummaryOverlay extends StatelessWidget {
             elevation: 4,
             color: surface,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
@@ -604,11 +604,11 @@ class _SummaryOverlay extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(_roadIcon(t),
-                                    size: 13, color: Colors.deepOrange),
+                                    size: 14, color: Colors.deepOrange),
                                 const SizedBox(width: 4),
                                 Text(t.label,
                                     style: const TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.black87)),
                               ],
@@ -832,14 +832,14 @@ class _SummaryOverlay extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: Colors.deepOrange),
+            Icon(icon, size: 16, color: Colors.deepOrange),
             const SizedBox(width: 3),
             Text(value,
                 style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }
@@ -848,10 +848,10 @@ class _SummaryOverlay extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(_conditionIcon(condition), size: 14, color: Colors.deepOrange),
+        Icon(_conditionIcon(condition), size: 16, color: Colors.deepOrange),
         const SizedBox(height: 2),
         Text(_conditionLabel(condition),
-            style: const TextStyle(fontSize: 9, color: Colors.grey)),
+            style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

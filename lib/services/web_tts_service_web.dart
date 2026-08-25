@@ -1,9 +1,20 @@
 import 'dart:js_interop';
-import 'package:web/web.dart' as web;
 
 import 'web_tts_service.dart';
 
 WebTtsService createWebTts() => _WebTtsImpl();
+
+@JS('navimotTTS')
+external JSObject? get _navimotTTS;
+
+@JS('navimotTTS.init')
+external JSBoolean _navimotTTS_init();
+
+@JS('navimotTTS.speak')
+external void _navimotTTS_speak(JSString text);
+
+@JS('navimotTTS.stop')
+external void _navimotTTS_stop();
 
 class _WebTtsImpl implements WebTtsService {
   bool _supported = false;
@@ -19,10 +30,13 @@ class _WebTtsImpl implements WebTtsService {
   @override
   Future<void> init() async {
     try {
-      final synth = web.window.speechSynthesis;
-      _synth = synth;
-      _supported = true;
-      print('[TTS] init OK, speechSynthesis found');
+      if (_navimotTTS == null) {
+        _supported = false;
+        print('[TTS] init FAILED: navimotTTS not found on window');
+        return;
+      }
+      _supported = _navimotTTS_init().toDart;
+      print('[TTS] init: supported=$_supported');
     } catch (e) {
       lastError = 'init: $e';
       _supported = false;
@@ -30,46 +44,17 @@ class _WebTtsImpl implements WebTtsService {
     }
   }
 
-  web.SpeechSynthesis? _synth;
-
   @override
   Future<void> activate() async {
-    if (!_supported || _synth == null || _activated) return;
-    try {
-      _synth!.cancel();
-      final u = web.SpeechSynthesisUtterance(' ');
-      u.lang = 'pl-PL';
-      u.volume = 0.0;
-      u.rate = 1.0;
-      u.pitch = 1.0;
-      _synth!.speak(u);
-      _activated = true;
-    } catch (e) {
-      lastError = 'activate: $e';
-      print('[TTS] activate FAILED: $e');
-    }
+    if (!_supported || _activated) return;
+    _activated = true;
   }
 
   @override
   Future<void> speak(String text) async {
-    if (!_supported || _synth == null) return;
+    if (!_supported) return;
     try {
-      _synth!.cancel();
-      final u = web.SpeechSynthesisUtterance(text);
-      u.lang = 'pl-PL';
-      u.rate = 1.0;
-      u.volume = 1.0;
-      u.pitch = 1.0;
-      try {
-        final voices = _synth!.getVoices().toDart;
-        for (final v in voices) {
-          if (v.lang.toLowerCase().startsWith('pl')) {
-            u.voice = v;
-            break;
-          }
-        }
-      } catch (_) {}
-      _synth!.speak(u);
+      _navimotTTS_speak(text.toJS);
       lastError = null;
     } catch (e) {
       lastError = 'speak: $e';
@@ -80,7 +65,7 @@ class _WebTtsImpl implements WebTtsService {
   @override
   Future<void> stop() async {
     try {
-      _synth?.cancel();
+      _navimotTTS_stop();
     } catch (_) {}
   }
 }

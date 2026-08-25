@@ -103,8 +103,8 @@ class WeatherScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: weatherVM.hasRiskyWeather
-                      ? Colors.red.withOpacity(0.2)
-                      : Colors.yellow.withOpacity(0.2),
+                      ? Colors.red.withValues(alpha: 0.2)
+                      : Colors.yellow.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -146,7 +146,7 @@ class WeatherScreen extends StatelessWidget {
                 color: _weatherColor(wp.condition), size: 24),
             const SizedBox(height: 4),
             Text('${wp.windSpeed.toInt()} km/h',
-                style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
       ),
@@ -160,7 +160,7 @@ class WeatherScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(value,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }

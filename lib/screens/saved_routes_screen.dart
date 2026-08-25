@@ -74,7 +74,7 @@ class SavedRoutesScreen extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: scenicColor.withOpacity(0.2),
+            color: scenicColor.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(Icons.route, color: scenicColor),
