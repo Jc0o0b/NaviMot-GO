@@ -607,6 +607,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Reagujemy na zmianę motywu / rozmiaru napisów bez opuszczania nawigacji.
+    context.watch<SettingsProvider>();
     final routeProvider = context.watch<RouteProvider>();
     final events = [
       ...routeProvider.routeCameras,
@@ -896,33 +898,44 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (steps.isEmpty) return const SizedBox.shrink();
     final step = steps[_nextStepIndex];
     final instruction = NavigationService.shared.instructionFor(step);
+    final scheme = Theme.of(context).colorScheme;
+    final big = _settings.bigNavFont;
+    final instructionSize = big ? 26.0 : 21.0;
+    final subSize = big ? 16.0 : 14.0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: big ? 18 : 15),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
         boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
       ),
       child: Row(
         children: [
-          Icon(_arrowFor(step), size: 40, color: Colors.deepOrange),
+          Icon(_arrowFor(step), size: big ? 52 : 44, color: Colors.deepOrange),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(instruction,
-                    style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontSize: instructionSize,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                        color: scheme.onSurface),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   [
                     'za ${_formatDistance(_distanceToNext)}',
                     if (step.name.isNotEmpty) step.name,
                   ].join(' · '),
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(
+                      fontSize: subSize,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface.withValues(alpha: 0.75)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1046,9 +1059,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
         top: false,
         child: Builder(
           builder: (context) {
+            final big = _settings.bigNavFont;
+            final scheme = Theme.of(context).colorScheme;
             final w = MediaQuery.sizeOf(context).width;
-            final speedSize = w < 360 ? 20.0 : 26.0;
-            final distSize = w < 360 ? 14.0 : 18.0;
+            final speedSize = (w < 360 ? 20.0 : 26.0) * (big ? 1.35 : 1.0);
+            final distSize = (w < 360 ? 14.0 : 18.0) * (big ? 1.35 : 1.0);
+            final labelSize = big ? 14.0 : 11.0;
+            final subSize = big ? 15.0 : 12.0;
             return Row(
               children: [
                 Expanded(
@@ -1059,17 +1076,22 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       Text('${_currentSpeed.round()} km/h',
                           style: TextStyle(
                               fontSize: speedSize,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w800,
                               color: Colors.deepOrange)),
-                      const Text('Prędkość',
-                          style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('Prędkość',
+                          style: TextStyle(
+                              fontSize: labelSize,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface.withValues(alpha: 0.7))),
                       if (_demoMode)
-                        const Text('Tryb demo',
+                        Text('Tryb demo',
                             style: TextStyle(
-                                fontSize: 11, color: Colors.deepOrange)),
+                                fontSize: labelSize,
+                                color: Colors.deepOrange)),
                       if (_ttsFailed)
-                        const Text('TTS niedostępne',
-                            style: TextStyle(fontSize: 11, color: Colors.red)),
+                        Text('TTS niedostępne',
+                            style:
+                                TextStyle(fontSize: labelSize, color: Colors.red)),
                     ],
                   ),
                 ),
@@ -1080,15 +1102,18 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     children: [
                       Text('Zostało $distText',
                           style: TextStyle(
-                              fontSize: distSize, fontWeight: FontWeight.bold)),
+                              fontSize: distSize,
+                              fontWeight: FontWeight.w800,
+                              color: scheme.onSurface)),
                       Text(timeText,
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey)),
+                          style: TextStyle(
+                              fontSize: subSize,
+                              color: scheme.onSurface.withValues(alpha: 0.8))),
                       Text(arrivalText,
-                          style: const TextStyle(
-                              fontSize: 12,
+                          style: TextStyle(
+                              fontSize: subSize,
                               color: Colors.deepOrange,
-                              fontWeight: FontWeight.w600)),
+                              fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),

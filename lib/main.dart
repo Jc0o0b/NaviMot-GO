@@ -44,11 +44,13 @@ class NavimotGoApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
+        final hc = settings.highContrast;
         return MaterialApp(
           title: 'NaviMot GO',
           debugShowCheckedModeBanner: false,
-          theme: _lightTheme(),
-          darkTheme: _darkTheme(),
+          theme: hc ? _highContrastTheme(Brightness.light) : _lightTheme(),
+          darkTheme:
+              hc ? _highContrastTheme(Brightness.dark) : _darkTheme(),
           themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
           home: const SplashScreen(),
         );
@@ -145,6 +147,75 @@ class NavimotGoApp extends StatelessWidget {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  /// Motyw wysokiego kontrastu („Tryb słońca”) — czytelny w pełnym słońcu.
+  ThemeData _highContrastTheme(Brightness brightness) {
+    final isLight = brightness == Brightness.light;
+    final bg = isLight ? Colors.white : Colors.black;
+    final surface = isLight ? Colors.white : const Color(0xFF0E0E0E);
+    final onSurface = isLight ? Colors.black : Colors.white;
+    final border = isLight ? Colors.black : Colors.white;
+
+    final base = ThemeData(
+      brightness: brightness,
+      colorSchemeSeed: Colors.deepOrange,
+      useMaterial3: true,
+      fontFamily: 'Montserrat',
+    );
+    return base.copyWith(
+      colorScheme: base.colorScheme.copyWith(
+        surface: surface,
+        onSurface: onSurface,
+        outline: border,
+      ),
+      scaffoldBackgroundColor: bg,
+      textTheme: base.textTheme.apply(
+        bodyColor: onSurface,
+        displayColor: onSurface,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: bg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 21,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.2,
+          color: onSurface,
+        ),
+        iconTheme: IconThemeData(color: onSurface),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: const Color(0x55FF5722),
+        elevation: 8,
+        height: 64,
+        labelTextStyle: WidgetStateProperty.all(
+          TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w800, color: onSurface),
+        ),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      ),
+      cardTheme: CardThemeData(
+        color: surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: border, width: 1.5),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );

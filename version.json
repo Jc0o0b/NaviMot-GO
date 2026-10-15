@@ -1,6 +1,6 @@
 {
-  "version": "1.6.0",
-  "build_number": 11,
-  "changelog": "Realne omijanie autostrad i drog platnych (Valhalla). Nowe ustawienie: nie wylaczaj ekranu podczas nawigacji. Wyszukiwanie miejsc: osobny debounce i czytelne bledy dla kazdego pola. Poprawki stabilnosci (zabezpieczenia async, izolacja danych pogody i miejsc). Wydajnosc: cache ciezkich obliczen trasy, szybsze przewijanie czatu, mniej zbednych przebudowan. Refaktoryzacja: wspoldzielone formatowanie tras i ikony pogody.",
+  "version": "2.0.0",
+  "build_number": 12,
+  "changelog": "Tryb slonca: wysokiego kontrastu interfejs czytelny w pelnym sloncu. Wieksze napisy nawigacji (wskazowki i predkosc). Uproszczony, czytelniejszy ekran jazdy. Nowe opcje personalizacji w Ustawieniach.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

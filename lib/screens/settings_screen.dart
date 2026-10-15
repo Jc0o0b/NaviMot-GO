@@ -89,14 +89,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const _SectionLabel('Wygląd'),
               Card(
-                child: SwitchListTile(
-                  secondary: const Icon(Icons.dark_mode_outlined,
-                      color: Colors.deepOrange),
-                  title: const Text('Tryb ciemny (Dark Mode)',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Ciemny motyw ułatwia czytanie w nocy'),
-                  value: settings.darkMode,
-                  onChanged: (v) => settings.setDarkMode(v),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.dark_mode_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Tryb ciemny (Dark Mode)',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle:
+                          const Text('Ciemny motyw ułatwia czytanie w nocy'),
+                      value: settings.darkMode,
+                      onChanged: (v) => settings.setDarkMode(v),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.wb_sunny_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Tryb słońca (wysoki kontrast)',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text(
+                          'Wyraźny interfejs czytelny w pełnym słońcu'),
+                      value: settings.highContrast,
+                      onChanged: (v) => settings.setHighContrast(v),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -136,6 +152,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Ekran pozostaje włączony podczas nawigacji'),
                       value: settings.keepScreenOn,
                       onChanged: (v) => settings.setKeepScreenOn(v),
+                    ),
+                    const Divider(height: 1, indent: 56),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.format_size_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Duże napisy nawigacji',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text(
+                          'Powiększ wskazówki i prędkość na ekranie jazdy'),
+                      value: settings.bigNavFont,
+                      onChanged: (v) => settings.setBigNavFont(v),
                     ),
                   ],
                 ),
