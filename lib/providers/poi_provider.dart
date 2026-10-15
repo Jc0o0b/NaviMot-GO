@@ -10,6 +10,8 @@ class POIProvider extends ChangeNotifier {
   String? _errorMessage;
   POICategory? _selectedCategory;
   PointOfInterest? _selectedPOI;
+  int _generation = 0;
+  bool _disposed = false;
 
   List<PointOfInterest> get pointsOfInterest => _pointsOfInterest;
   bool get isLoading => _isLoading;
@@ -19,15 +21,20 @@ class POIProvider extends ChangeNotifier {
 
   void loadPOIs(MotorcycleRoute route, {double radius = 10000}) {
     if (route.waypoints.isEmpty) return;
+    final gen = ++_generation;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    POIService.shared.fetchPOIsAlongRoute(route.waypoints, radius: radius).then((pois) {
+    POIService.shared
+        .fetchPOIsAlongRoute(route.waypoints, radius: radius)
+        .then((pois) {
+      if (_disposed || gen != _generation) return;
       _pointsOfInterest = pois;
       _isLoading = false;
       notifyListeners();
     }).catchError((e) {
+      if (_disposed || gen != _generation) return;
       _errorMessage = 'Nie udało się pobrać miejsc: $e';
       _isLoading = false;
       notifyListeners();
@@ -35,24 +42,37 @@ class POIProvider extends ChangeNotifier {
   }
 
   void loadPOIsNear(LatLng coordinate) {
+    final gen = ++_generation;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    POIService.shared.fetchPOIsNearLocation(coordinate, category: _selectedCategory).then((pois) {
+    POIService.shared
+        .fetchPOIsNearLocation(coordinate, category: _selectedCategory)
+        .then((pois) {
+      if (_disposed || gen != _generation) return;
       _pointsOfInterest = pois;
       _isLoading = false;
       notifyListeners();
     }).catchError((e) {
+      if (_disposed || gen != _generation) return;
       _errorMessage = 'Nie udało się pobrać miejsc: $e';
       _isLoading = false;
       notifyListeners();
     });
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   List<PointOfInterest> get filteredPOIs {
     if (_selectedCategory == null) return _pointsOfInterest;
-    return _pointsOfInterest.where((p) => p.category == _selectedCategory).toList();
+    return _pointsOfInterest
+        .where((p) => p.category == _selectedCategory)
+        .toList();
   }
 
   Map<POICategory, List<PointOfInterest>> get categorizedPOIs {
@@ -66,9 +86,9 @@ class POIProvider extends ChangeNotifier {
   List<MapEntry<POICategory, int>> get categoryCounts {
     final grouped = categorizedPOIs;
     return POICategory.values
-      .map((c) => MapEntry(c, grouped[c]?.length ?? 0))
-      .where((e) => e.value > 0)
-      .toList();
+        .map((c) => MapEntry(c, grouped[c]?.length ?? 0))
+        .where((e) => e.value > 0)
+        .toList();
   }
 
   void selectCategory(POICategory? category) {

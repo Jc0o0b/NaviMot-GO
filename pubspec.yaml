@@ -1,7 +1,7 @@
 name: navimot_go
 description: NaviMot GO - nawigacja i malownicze trasy motocyklowe z pogodą i miejscami dla motocyklisty.
 publish_to: 'none'
-version: 1.5.0+10
+version: 1.6.0+11
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -22,6 +22,7 @@ dependencies:
   web: ^1.1.1
   url_launcher: ^6.3.0
   package_info_plus: ^8.0.0
+  wakelock_plus: ^1.2.0
 
 dev_dependencies:
   flutter_test:

@@ -94,6 +94,6 @@ class TravelTimeInfo {
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     if (h > 0) return '${h}h ${m}min';
-    return '${m} min';
+    return '$m min';
   }
 }

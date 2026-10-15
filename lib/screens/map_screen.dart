@@ -16,6 +16,7 @@ import '../widgets/event_widgets.dart';
 import '../widgets/weather_icon.dart';
 import '../widgets/poi_marker.dart';
 import '../widgets/traffic_overlay.dart';
+import '../utils/route_format.dart';
 import '../utils/route_geometry.dart';
 import '../utils/route_proximity.dart';
 import 'navigation_screen.dart';
@@ -34,13 +35,24 @@ class _MapScreenState extends State<MapScreen>
   String? _poisLoadedRouteId;
   bool _poisShownOnMap = false;
   String? _focusedPoiId;
-  LatLng _mapCenter = const LatLng(52.2297, 21.0122);
 
   late final AnimationController _drawCtrl;
   Animation<double>? _drawAnim;
   List<LatLng> _animPoints = [];
   int _animCount = 0;
   bool _animDone = false;
+  String? _decimatedRouteId;
+  List<LatLng> _routeDecimated = const [];
+
+  /// Cache uproszczonej geometrii trasy — wcześniej `decimate` liczyło się
+  /// dwa razy w każdym przebudowaniu, w tym w każdej klatce animacji rysowania.
+  List<LatLng> _decimatedFor(MotorcycleRoute route) {
+    if (_decimatedRouteId != route.id) {
+      _decimatedRouteId = route.id;
+      _routeDecimated = RouteGeometry.decimate(route.waypoints, 1200);
+    }
+    return _routeDecimated;
+  }
 
   @override
   void initState() {
@@ -62,8 +74,9 @@ class _MapScreenState extends State<MapScreen>
     if (route != null && route.id != _fittedRouteId) {
       _fittedRouteId = route.id;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || context.read<RouteProvider>().currentRoute == null)
+        if (!mounted || context.read<RouteProvider>().currentRoute == null) {
           return;
+        }
         final r = context.read<RouteProvider>().currentRoute!;
         _fitRoute(r);
         _startRouteAnimation(r);
@@ -95,10 +108,6 @@ class _MapScreenState extends State<MapScreen>
                 : const LatLng(52.2297, 21.0122),
             initialZoom: route?.waypoints.isNotEmpty == true ? 9.0 : 6.0,
             onTap: _handleMapTap,
-            onPositionChanged: (camera, hasGesture) {
-              final center = camera.center;
-              if (center != null) _mapCenter = center;
-            },
           ),
           children: [
             TileLayer(
@@ -110,13 +119,13 @@ class _MapScreenState extends State<MapScreen>
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: RouteGeometry.decimate(route.waypoints, 1200),
+                    points: _decimatedFor(route),
                     color: Colors.white,
                     strokeWidth: 8,
                   ),
                   if (_animDone)
                     Polyline(
-                      points: RouteGeometry.decimate(route.waypoints, 1200),
+                      points: _decimatedFor(route),
                       color: Colors.deepOrange,
                       strokeWidth: 5,
                     )
@@ -327,8 +336,9 @@ class _POIMarkersLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final poiVM = context.watch<POIProvider>();
     final selected = poiVM.selectedPOI;
-    if (!visible || poiVM.pointsOfInterest.isEmpty)
+    if (!visible || poiVM.pointsOfInterest.isEmpty) {
       return const SizedBox.shrink();
+    }
     final markers = poiVM.pointsOfInterest
         .take(30)
         .map((poi) => Marker(
@@ -515,8 +525,8 @@ class _SummaryOverlay extends StatelessWidget {
     return Positioned(
       left: 8,
       right: 8,
-        bottom: 16,
-        child: Column(
+      bottom: 16,
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -527,7 +537,7 @@ class _SummaryOverlay extends StatelessWidget {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
@@ -537,8 +547,7 @@ class _SummaryOverlay extends StatelessWidget {
                         Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => NavigationScreen(
                         route: route,
-                        intermediateWaypoints:
-                            routeVM.intermediateWaypoints,
+                        intermediateWaypoints: routeVM.intermediateWaypoints,
                       ),
                     )),
                     icon: const Icon(Icons.navigation, size: 20),
@@ -579,8 +588,8 @@ class _SummaryOverlay extends StatelessWidget {
                             travel.formattedTotalTime, 'Z przerwami'),
                         _summaryItem(Icons.straighten, travel.formattedDistance,
                             'Dystans'),
-                        _summaryItem(Icons.alarm, travel.formattedArrival(),
-                            'Przyjazd'),
+                        _summaryItem(
+                            Icons.alarm, travel.formattedArrival(), 'Przyjazd'),
                       ],
                     ),
                   ],
@@ -621,8 +630,8 @@ class _SummaryOverlay extends StatelessWidget {
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: TrafficLegend(
-                          hasSlow: hasSlow, hasBlock: hasBlock),
+                      child:
+                          TrafficLegend(hasSlow: hasSlow, hasBlock: hasBlock),
                     ),
                   ],
                   if (weatherVM.weatherPoints.isNotEmpty) ...[
@@ -659,7 +668,8 @@ class _SummaryOverlay extends StatelessWidget {
                     label: const Text('Zapisz trasę'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.deepOrange,
-                      side: const BorderSide(color: Colors.deepOrange, width: 1.5),
+                      side: const BorderSide(
+                          color: Colors.deepOrange, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       textStyle: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600),
@@ -699,8 +709,7 @@ class _SummaryOverlay extends StatelessWidget {
               child: Text(
                 'Wyznaczona obecnie trasa jest najszybsza '
                 'i zarazem najbardziej malownicza',
-                style:
-                    TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -728,9 +737,7 @@ class _SummaryOverlay extends StatelessWidget {
             child: _AlternativeTile(
               route: alt,
               selected: routeVM.currentRoute?.id == alt.id,
-              timeOverride: alt.label == 'Najszybsza'
-                  ? displayedFastest
-                  : null,
+              timeOverride: alt.label == 'Najszybsza' ? displayedFastest : null,
               onTap: () => routeVM.selectRoute(alt),
             ),
           ),
@@ -767,8 +774,8 @@ class _SummaryOverlay extends StatelessWidget {
               label: const Text('Wyszukaj miejsca wzdłuż trasy'),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.deepOrange,
-                textStyle: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600),
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           )
@@ -784,8 +791,7 @@ class _SummaryOverlay extends StatelessWidget {
                   dense: true,
                   leading: CircleAvatar(
                     radius: 16,
-                    backgroundColor:
-                        Colors.orange.withValues(alpha: 0.2),
+                    backgroundColor: Colors.orange.withValues(alpha: 0.2),
                     child: Icon(_poiIcon(poi.category),
                         color: Colors.orange, size: 16),
                   ),
@@ -995,15 +1001,8 @@ class _AlternativeTile extends StatelessWidget {
     );
   }
 
-  String _formatDuration(double seconds) {
-    final h = (seconds / 3600).floor();
-    final m = ((seconds % 3600) / 60).round();
-    if (h > 0) return '$h h $m min';
-    return '$m min';
-  }
+  String _formatDuration(double seconds) =>
+      RouteFormat.duration(seconds.round());
 
-  String _formatDistance(double meters) {
-    final km = meters / 1000.0;
-    return km >= 100 ? '${km.toInt()} km' : '${km.toStringAsFixed(1)} km';
-  }
+  String _formatDistance(double meters) => RouteFormat.distance(meters);
 }

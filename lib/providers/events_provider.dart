@@ -14,8 +14,11 @@ class EventsProvider extends ChangeNotifier {
   bool _loaded = false;
   Future<void>? _loadFuture;
 
-  List<RoadEvent> get events => List.unmodifiable(_events);
-  List<ImportantPlace> get importantPlaces => List.unmodifiable(_places);
+  // Zwracamy listy bezpośrednio (bez List.unmodifiable) — wcześniej każdy
+  // dostęp alokował nową listę, co powodowało GC w pętli build i sprawiało,
+  // że porównania tożsamości w cache'ach widgetów nigdy nie trafiały.
+  List<RoadEvent> get events => _events;
+  List<ImportantPlace> get importantPlaces => _places;
   bool get isLoaded => _loaded;
 
   EventsProvider() {

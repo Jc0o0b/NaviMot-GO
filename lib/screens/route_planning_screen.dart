@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/country.dart';
+import '../models/important_place.dart';
+import '../models/road_event.dart';
 import '../models/route.dart';
 import '../models/traffic_regulations.dart';
 import '../providers/events_provider.dart';
@@ -36,18 +38,28 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   List<GeocodingResult> _startResults = [];
   List<GeocodingResult> _endResults = [];
   List<GeocodingResult> _waypointResults = [];
-  Timer? _debounce;
-  int _searchSequence = 0;
+  final Map<TextEditingController, Timer> _debounces = {};
+  final Map<TextEditingController, int> _searchSequences = {};
   bool _startLoading = false;
   bool _endLoading = false;
   bool _waypointLoading = false;
+  String? _startError;
+  String? _endError;
+  String? _waypointError;
   String? _loadedRouteId;
   bool _navigateOnReady = false;
   bool _addingWaypoint = false;
+  String? _confirmRouteId;
+  List<ImportantPlace>? _confirmPlacesSrc;
+  List<RoadEvent>? _confirmEventsSrc;
+  List<RoadEvent>? _confirmCamerasSrc;
+  _ConfirmInfo? _confirmInfo;
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    for (final t in _debounces.values) {
+      t.cancel();
+    }
     _startController.dispose();
     _endController.dispose();
     _waypointController.dispose();
@@ -87,7 +99,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 360 ? 10 : 16),
+                  padding: EdgeInsets.all(
+                      MediaQuery.sizeOf(context).width < 360 ? 10 : 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -110,14 +123,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         hint: 'Wpisz miejsce startu...',
                         results: _startResults,
                         loading: _startLoading,
+                        error: _startError,
                         onHomeTap: _useHomeAsStart,
                         onSelected: (loc) {
                           _startController.text = loc.displayName;
                           routeVM.setStartLocation(LatLng(loc.lat, loc.lon));
                           _startResults = [];
                         },
-                        onChanged: (q) =>
-                            _searchLocation(q, (r) => _startResults = r),
                       ),
                       const SizedBox(height: 12),
                       _buildLocationField(
@@ -127,14 +139,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         hint: 'Wpisz miejsce docelowe...',
                         results: _endResults,
                         loading: _endLoading,
+                        error: _endError,
                         onHomeTap: _useHomeAsEnd,
                         onSelected: (loc) {
                           _endController.text = loc.displayName;
                           routeVM.setEndLocation(LatLng(loc.lat, loc.lon));
                           _endResults = [];
                         },
-                        onChanged: (q) =>
-                            _searchLocation(q, (r) => _endResults = r),
                       ),
                       const SizedBox(height: 12),
                       if (_addingWaypoint)
@@ -145,13 +156,12 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           hint: 'Wpisz przystanek po drodze...',
                           results: _waypointResults,
                           loading: _waypointLoading,
+                          error: _waypointError,
                           onSelected: (loc) {
                             _waypointController.text = loc.displayName;
                             routeVM.addWaypoint(LatLng(loc.lat, loc.lon));
                             _waypointResults = [];
                           },
-                          onChanged: (q) =>
-                              _searchLocation(q, (r) => _waypointResults = r),
                         )
                       else
                         FilledButton.icon(
@@ -218,9 +228,9 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     required String hint,
     required List<GeocodingResult> results,
     required void Function(GeocodingResult) onSelected,
-    required void Function(String) onChanged,
     VoidCallback? onHomeTap,
     bool loading = false,
+    String? error,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,7 +274,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       controller.clear();
-                      onChanged('');
+                      _onSearchChanged(controller, '');
                     },
                   ),
           ),
@@ -276,10 +286,13 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
             child: Text('Szukam...',
                 style: TextStyle(fontSize: 12, color: Colors.grey[500])),
           ),
-        if (results.isEmpty && !loading && GeocodingService.shared.lastError != null && controller.text.length >= 3)
+        if (results.isEmpty &&
+            !loading &&
+            error != null &&
+            controller.text.length >= 3)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text('Błąd: ${GeocodingService.shared.lastError}',
+            child: Text('Błąd: $error',
                 style: TextStyle(fontSize: 11, color: Colors.red[400])),
           ),
         if (results.isNotEmpty)
@@ -417,24 +430,56 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     );
   }
 
-  Widget _buildConfirmation(RouteProvider routeVM, EventsProvider eventsVM) {
+  /// Wylicza (i cache'uje) miejsca, zdarzenia i korki wokół trasy.
+  /// Bez cache te obliczenia (skan wszystkich zdarzeń/miejsc) wykonywały się
+  /// przy każdym przebudowaniu ekranu, np. przy każdym znaku wpisywanym w polu.
+  _ConfirmInfo _confirmInfoFor(RouteProvider routeVM, EventsProvider eventsVM) {
     final route = routeVM.currentRoute!;
+    final places = eventsVM.importantPlaces;
+    final events = eventsVM.events;
+    final cameras = routeVM.routeCameras;
+    if (_confirmInfo != null &&
+        _confirmRouteId == route.id &&
+        identical(_confirmPlacesSrc, places) &&
+        identical(_confirmEventsSrc, events) &&
+        identical(_confirmCamerasSrc, cameras)) {
+      return _confirmInfo!;
+    }
     final nearPlaces = itemsWithinRoute(
-      eventsVM.importantPlaces,
+      places,
       route.waypoints,
       5000,
       (p) => LatLng(p.lat, p.lon),
     );
     final nearEvents = itemsWithinRoute(
-      [...eventsVM.events, ...routeVM.routeCameras],
+      [...events, ...cameras],
       route.waypoints,
       5000,
       (e) => LatLng(e.lat, e.lon),
     );
     final traffic =
         TrafficService.shared.trafficAlongRoute(route.waypoints, nearEvents);
-    final hasBlock = TrafficService.shared.hasBlock(traffic);
-    final hasSlow = TrafficService.shared.hasSlow(traffic);
+    final info = _ConfirmInfo(
+      nearPlaces,
+      nearEvents,
+      TrafficService.shared.hasBlock(traffic),
+      TrafficService.shared.hasSlow(traffic),
+    );
+    _confirmRouteId = route.id;
+    _confirmPlacesSrc = places;
+    _confirmEventsSrc = events;
+    _confirmCamerasSrc = cameras;
+    _confirmInfo = info;
+    return info;
+  }
+
+  Widget _buildConfirmation(RouteProvider routeVM, EventsProvider eventsVM) {
+    final route = routeVM.currentRoute!;
+    final info = _confirmInfoFor(routeVM, eventsVM);
+    final nearPlaces = info.nearPlaces;
+    final nearEvents = info.nearEvents;
+    final hasBlock = info.hasBlock;
+    final hasSlow = info.hasSlow;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -459,9 +504,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 const Icon(Icons.alarm, size: 15, color: Colors.deepOrange),
                 const SizedBox(width: 6),
                 Text(
-                  'Przyjazd ok. ${PolishTrafficRegulations.shared
-                      .calculateTravelTime(route.totalDistance, route.roadTypes)
-                      .formattedArrival()}',
+                  'Przyjazd ok. ${PolishTrafficRegulations.shared.calculateTravelTime(route.totalDistance, route.roadTypes).formattedArrival()}',
                   style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -475,19 +518,16 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: (hasBlock ? Colors.red : Colors.orange).withValues(
-                      alpha: 0.1),
+                  color: (hasBlock ? Colors.red : Colors.orange)
+                      .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: hasBlock ? Colors.red : Colors.orange,
-                      width: 1),
+                      color: hasBlock ? Colors.red : Colors.orange, width: 1),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      hasBlock
-                          ? Icons.block
-                          : Icons.traffic,
+                      hasBlock ? Icons.block : Icons.traffic,
                       size: 18,
                       color: hasBlock ? Colors.red : Colors.orange,
                     ),
@@ -527,8 +567,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => NavigationScreen(
                         route: route,
-                        intermediateWaypoints:
-                            routeVM.intermediateWaypoints,
+                        intermediateWaypoints: routeVM.intermediateWaypoints,
                       ),
                     )),
                     icon: const Icon(Icons.navigation, size: 18),
@@ -599,8 +638,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           children: [
                             Text(e.type.label,
                                 style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
                             if (e.description != null &&
                                 e.description!.isNotEmpty)
                               Text(e.description!,
@@ -651,8 +689,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           children: [
                             Text(p.name,
                                 style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
                             if (p.note.isNotEmpty)
                               Text(p.note,
                                   maxLines: 2,
@@ -772,20 +809,24 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   }
 
   void _onSearchChanged(TextEditingController controller, String query) {
-    _debounce?.cancel();
-    final seq = ++_searchSequence;
+    _debounces[controller]?.cancel();
+    final seq = (_searchSequences[controller] ?? 0) + 1;
+    _searchSequences[controller] = seq;
 
-    void updateResults(List<GeocodingResult> r) {
-      if (seq != _searchSequence || !mounted) return;
+    void updateResults(GeocodingSearchResult r) {
+      if (seq != _searchSequences[controller] || !mounted) return;
       setState(() {
         if (controller == _startController) {
-          _startResults = r;
+          _startResults = r.results;
+          _startError = r.error;
           _startLoading = false;
         } else if (controller == _endController) {
-          _endResults = r;
+          _endResults = r.results;
+          _endError = r.error;
           _endLoading = false;
         } else {
-          _waypointResults = r;
+          _waypointResults = r.results;
+          _waypointError = r.error;
           _waypointLoading = false;
         }
       });
@@ -794,19 +835,19 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
     if (query.trim().toLowerCase() == 'dom') {
       final home = context.read<SettingsProvider>().home;
       if (home != null) {
-        updateResults([
+        updateResults(GeocodingSearchResult([
           GeocodingResult(
             displayName: home.name,
             shortName: 'Dom',
             lat: home.lat,
             lon: home.lon,
           ),
-        ]);
+        ]));
         return;
       }
     }
     if (query.length < 3) {
-      updateResults([]);
+      updateResults(const GeocodingSearchResult([]));
       return;
     }
     setState(() {
@@ -818,7 +859,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
         _waypointLoading = true;
       }
     });
-    _debounce = Timer(const Duration(milliseconds: 400), () {
+    _debounces[controller] = Timer(const Duration(milliseconds: 400), () {
       _searchLocation(query, updateResults);
     });
   }
@@ -854,8 +895,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 if (newIndex > oldIndex) newIndex--;
                 final moved = updated.removeAt(oldIndex);
                 updated.insert(newIndex, moved);
-                routeVM.setWaypointOrder(
-                    updated.whereType<LatLng>().toList());
+                routeVM.setWaypointOrder(updated.whereType<LatLng>().toList());
               },
               itemBuilder: (context, index) {
                 final item = items[index];
@@ -871,8 +911,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 }
                 final wp = item as LatLng;
                 return _StopTile(
-                  key: ValueKey(
-                      'wp-${wp.latitude},${wp.longitude}'),
+                  key: ValueKey('wp-${wp.latitude},${wp.longitude}'),
                   index: index,
                   icon: Icons.place,
                   color: Colors.blue,
@@ -891,9 +930,9 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   }
 
   void _searchLocation(
-      String query, Function(List<GeocodingResult>) onResult) async {
-    final results = await GeocodingService.shared.search(query);
-    if (mounted) onResult(results);
+      String query, Function(GeocodingSearchResult) onResult) async {
+    final result = await GeocodingService.shared.search(query);
+    if (mounted) onResult(result);
   }
 }
 
@@ -902,6 +941,20 @@ class _DestinationStop {
 }
 
 enum _LocTarget { start, end, waypoint }
+
+class _ConfirmInfo {
+  final List<ImportantPlace> nearPlaces;
+  final List<RoadEvent> nearEvents;
+  final bool hasBlock;
+  final bool hasSlow;
+
+  const _ConfirmInfo(
+    this.nearPlaces,
+    this.nearEvents,
+    this.hasBlock,
+    this.hasSlow,
+  );
+}
 
 class _StopTile extends StatelessWidget {
   final int? index;

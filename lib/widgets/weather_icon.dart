@@ -18,39 +18,61 @@ class WeatherIconWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_icon(), size: 18, color: _color()),
+          Icon(iconFor(point.condition),
+              size: 18, color: colorFor(point.condition)),
           Text('${point.temperature.toInt()}°',
-            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  IconData _icon() {
-    switch (point.condition) {
-      case WeatherCondition.sunny: return Icons.wb_sunny;
-      case WeatherCondition.partlyCloudy: return Icons.cloud;
-      case WeatherCondition.cloudy: return Icons.cloud;
-      case WeatherCondition.rain: return Icons.water;
-      case WeatherCondition.heavyRain: return Icons.thunderstorm;
-      case WeatherCondition.thunderstorm: return Icons.flash_on;
-      case WeatherCondition.snow: return Icons.ac_unit;
-      case WeatherCondition.fog: return Icons.foggy;
-      case WeatherCondition.windy: return Icons.air;
+  static IconData iconFor(WeatherCondition condition) {
+    switch (condition) {
+      case WeatherCondition.sunny:
+        return Icons.wb_sunny;
+      case WeatherCondition.partlyCloudy:
+        return Icons.cloud;
+      case WeatherCondition.cloudy:
+        return Icons.cloud;
+      case WeatherCondition.rain:
+        return Icons.water;
+      case WeatherCondition.heavyRain:
+        return Icons.thunderstorm;
+      case WeatherCondition.thunderstorm:
+        return Icons.flash_on;
+      case WeatherCondition.snow:
+        return Icons.ac_unit;
+      case WeatherCondition.fog:
+        return Icons.foggy;
+      case WeatherCondition.windy:
+        return Icons.air;
     }
   }
 
-  Color _color() {
-    switch (point.condition) {
-      case WeatherCondition.sunny: return Colors.yellow;
-      case WeatherCondition.partlyCloudy: return Colors.orange;
-      case WeatherCondition.cloudy: return Colors.grey;
-      case WeatherCondition.rain: return Colors.blue;
-      case WeatherCondition.heavyRain: return Colors.indigo;
-      case WeatherCondition.thunderstorm: return Colors.purple;
-      case WeatherCondition.snow: return Colors.cyan;
-      case WeatherCondition.fog: return Colors.grey;
-      case WeatherCondition.windy: return Colors.teal;
+  static Color colorFor(WeatherCondition condition) {
+    switch (condition) {
+      case WeatherCondition.sunny:
+        return Colors.yellow;
+      case WeatherCondition.partlyCloudy:
+        return Colors.orange;
+      case WeatherCondition.cloudy:
+        return Colors.grey;
+      case WeatherCondition.rain:
+        return Colors.blue;
+      case WeatherCondition.heavyRain:
+        return Colors.indigo;
+      case WeatherCondition.thunderstorm:
+        return Colors.purple;
+      case WeatherCondition.snow:
+        return Colors.cyan;
+      case WeatherCondition.fog:
+        return Colors.grey;
+      case WeatherCondition.windy:
+        return Colors.teal;
     }
   }
 }

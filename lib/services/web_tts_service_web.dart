@@ -1,20 +1,22 @@
 import 'dart:js_interop';
 
+import 'package:flutter/foundation.dart';
+
 import 'web_tts_service.dart';
 
 WebTtsService createWebTts() => _WebTtsImpl();
 
 @JS('navimotTTS')
-external JSObject? get _navimotTTS;
+external JSObject? get _navimotTts;
 
 @JS('navimotTTS.init')
-external JSBoolean _navimotTTS_init();
+external JSBoolean _navimotTtsInit();
 
 @JS('navimotTTS.speak')
-external void _navimotTTS_speak(JSString text);
+external void _navimotTtsSpeak(JSString text);
 
 @JS('navimotTTS.stop')
-external void _navimotTTS_stop();
+external void _navimotTtsStop();
 
 class _WebTtsImpl implements WebTtsService {
   bool _supported = false;
@@ -30,17 +32,17 @@ class _WebTtsImpl implements WebTtsService {
   @override
   Future<void> init() async {
     try {
-      if (_navimotTTS == null) {
+      if (_navimotTts == null) {
         _supported = false;
-        print('[TTS] init FAILED: navimotTTS not found on window');
+        debugPrint('[TTS] init FAILED: navimotTTS not found on window');
         return;
       }
-      _supported = _navimotTTS_init().toDart;
-      print('[TTS] init: supported=$_supported');
+      _supported = _navimotTtsInit().toDart;
+      debugPrint('[TTS] init: supported=$_supported');
     } catch (e) {
       lastError = 'init: $e';
       _supported = false;
-      print('[TTS] init FAILED: $e');
+      debugPrint('[TTS] init FAILED: $e');
     }
   }
 
@@ -54,18 +56,18 @@ class _WebTtsImpl implements WebTtsService {
   Future<void> speak(String text) async {
     if (!_supported) return;
     try {
-      _navimotTTS_speak(text.toJS);
+      _navimotTtsSpeak(text.toJS);
       lastError = null;
     } catch (e) {
       lastError = 'speak: $e';
-      print('[TTS] speak FAILED: $e');
+      debugPrint('[TTS] speak FAILED: $e');
     }
   }
 
   @override
   Future<void> stop() async {
     try {
-      _navimotTTS_stop();
+      _navimotTtsStop();
     } catch (_) {}
   }
 }

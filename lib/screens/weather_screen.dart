@@ -4,6 +4,7 @@ import '../models/weather_point.dart';
 import '../providers/weather_provider.dart';
 import '../providers/route_provider.dart';
 import '../widgets/section_header.dart';
+import '../widgets/weather_icon.dart';
 
 class WeatherScreen extends StatelessWidget {
   const WeatherScreen({super.key});
@@ -165,51 +166,9 @@ class WeatherScreen extends StatelessWidget {
     );
   }
 
-  IconData _weatherIcon(WeatherCondition c) {
-    switch (c) {
-      case WeatherCondition.sunny:
-        return Icons.wb_sunny;
-      case WeatherCondition.partlyCloudy:
-        return Icons.cloud;
-      case WeatherCondition.cloudy:
-        return Icons.cloud;
-      case WeatherCondition.rain:
-        return Icons.water;
-      case WeatherCondition.heavyRain:
-        return Icons.thunderstorm;
-      case WeatherCondition.thunderstorm:
-        return Icons.flash_on;
-      case WeatherCondition.snow:
-        return Icons.ac_unit;
-      case WeatherCondition.fog:
-        return Icons.foggy;
-      case WeatherCondition.windy:
-        return Icons.air;
-    }
-  }
+  IconData _weatherIcon(WeatherCondition c) => WeatherIconWidget.iconFor(c);
 
-  Color _weatherColor(WeatherCondition c) {
-    switch (c) {
-      case WeatherCondition.sunny:
-        return Colors.yellow;
-      case WeatherCondition.partlyCloudy:
-        return Colors.orange;
-      case WeatherCondition.cloudy:
-        return Colors.grey;
-      case WeatherCondition.rain:
-        return Colors.blue;
-      case WeatherCondition.heavyRain:
-        return Colors.indigo;
-      case WeatherCondition.thunderstorm:
-        return Colors.purple;
-      case WeatherCondition.snow:
-        return Colors.cyan;
-      case WeatherCondition.fog:
-        return Colors.grey;
-      case WeatherCondition.windy:
-        return Colors.teal;
-    }
-  }
+  Color _weatherColor(WeatherCondition c) => WeatherIconWidget.colorFor(c);
 
   String _conditionName(WeatherCondition c) {
     switch (c) {

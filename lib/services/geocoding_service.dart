@@ -15,6 +15,18 @@ class GeocodingResult {
   });
 }
 
+/// Wynik wyszukiwania wraz z ewentualnym błędem sieci.
+///
+/// Dzięki temu błąd jest przypisany do konkretnego zapytania (pola), a nie
+/// przechowywany globalnie w singletonie — wcześniej równoległe wyszukiwania
+/// pola startu i celu nadpisywały sobie nawzajem komunikat błędu.
+class GeocodingSearchResult {
+  final List<GeocodingResult> results;
+  final String? error;
+
+  const GeocodingSearchResult(this.results, {this.error});
+}
+
 class GeocodingService {
   static final GeocodingService _instance = GeocodingService._();
   static GeocodingService get shared => _instance;
@@ -22,32 +34,35 @@ class GeocodingService {
 
   final http.Client _client = http.Client();
 
-  String? lastError;
+  Future<GeocodingSearchResult> search(String query, {int limit = 6}) async {
+    if (query.length < 3) return const GeocodingSearchResult([]);
 
-  Future<List<GeocodingResult>> search(String query, {int limit = 6}) async {
-    if (query.length < 3) return [];
-    lastError = null;
+    final photon = await _searchPhoton(query, limit);
+    if (photon != null && photon.isNotEmpty) {
+      return GeocodingSearchResult(photon);
+    }
 
-    var results = await _searchPhoton(query, limit);
-    if (results != null) return results;
+    final nominatim = await _searchNominatim(query, limit);
+    if (nominatim != null && nominatim.isNotEmpty) {
+      return GeocodingSearchResult(nominatim);
+    }
 
-    results = await _searchNominatim(query, limit);
-    if (results != null) return results;
-
-    return [];
+    // Oba źródła puste — rozróżniamy brak wyników od braku połączenia.
+    if (photon == null && nominatim == null) {
+      return const GeocodingSearchResult([],
+          error: 'Brak połączenia z usługą wyszukiwania');
+    }
+    return const GeocodingSearchResult([]);
   }
 
-  Future<List<GeocodingResult>?> _searchPhoton(
-      String query, int limit) async {
+  /// Zwraca `null` przy błędzie sieci/HTTP, a listę (także pustą) przy sukcesie.
+  Future<List<GeocodingResult>?> _searchPhoton(String query, int limit) async {
     try {
       final uri = Uri.parse(
           'https://photon.komoot.io/api/?q=${Uri.encodeComponent(query)}&limit=$limit');
       final response =
           await _client.get(uri).timeout(const Duration(seconds: 6));
-      if (response.statusCode != 200) {
-        lastError = 'Photon HTTP ${response.statusCode}';
-        return null;
-      }
+      if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final features = data['features'] as List? ?? [];
       final results = <GeocodingResult>[];
@@ -64,30 +79,22 @@ class GeocodingService {
           lon: (coords[0] as num).toDouble(),
         ));
       }
-      if (results.isNotEmpty) {
-        lastError = null;
-        return results;
-      }
-      lastError = null;
       return results;
     } catch (e) {
-      lastError = 'Photon: $e';
       return null;
     }
   }
 
+  /// Zwraca `null` przy błędzie sieci/HTTP, a listę (także pustą) przy sukcesie.
   Future<List<GeocodingResult>?> _searchNominatim(
       String query, int limit) async {
     try {
       final uri = Uri.parse(
           'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=$limit&accept-language=pl');
-      final response = await _client
-          .get(uri, headers: {'User-Agent': 'NaviMotGO/1.1'})
-          .timeout(const Duration(seconds: 6));
-      if (response.statusCode != 200) {
-        lastError = 'Nominatim HTTP ${response.statusCode}';
-        return null;
-      }
+      final response = await _client.get(uri, headers: {
+        'User-Agent': 'NaviMotGO/1.1'
+      }).timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body) as List;
       final results = <GeocodingResult>[];
       for (final item in data) {
@@ -104,14 +111,8 @@ class GeocodingService {
           lon: lon,
         ));
       }
-      if (results.isNotEmpty) {
-        lastError = null;
-        return results;
-      }
-      lastError = null;
       return results;
     } catch (e) {
-      lastError = 'Nominatim: $e';
       return null;
     }
   }

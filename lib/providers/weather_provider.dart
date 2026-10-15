@@ -8,6 +8,8 @@ class WeatherProvider extends ChangeNotifier {
   List<WeatherPoint> _weatherPoints = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _generation = 0;
+  bool _disposed = false;
 
   List<WeatherPoint> get weatherPoints => _weatherPoints;
   bool get isLoading => _isLoading;
@@ -15,19 +17,30 @@ class WeatherProvider extends ChangeNotifier {
 
   void loadWeather(MotorcycleRoute route) {
     if (route.waypoints.isEmpty) return;
+    final gen = ++_generation;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    WeatherService.shared.fetchWeatherAlongRoute(route.waypoints).then((points) {
+    WeatherService.shared
+        .fetchWeatherAlongRoute(route.waypoints)
+        .then((points) {
+      if (_disposed || gen != _generation) return;
       _weatherPoints = points;
       _isLoading = false;
       notifyListeners();
     }).catchError((e) {
+      if (_disposed || gen != _generation) return;
       _errorMessage = 'Nie udało się pobrać pogody: $e';
       _isLoading = false;
       notifyListeners();
     });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   WeatherPoint? weatherAtCoordinate(LatLng coordinate) {
@@ -55,28 +68,39 @@ class WeatherProvider extends ChangeNotifier {
 
   double get averageTemperature {
     if (_weatherPoints.isEmpty) return 0;
-    return _weatherPoints.fold(0.0, (sum, wp) => sum + wp.temperature) / _weatherPoints.length;
+    return _weatherPoints.fold(0.0, (sum, wp) => sum + wp.temperature) /
+        _weatherPoints.length;
   }
 
   double get maxWindSpeed {
     if (_weatherPoints.isEmpty) return 0;
-    return _weatherPoints.map((wp) => wp.windSpeed).reduce((a, b) => a > b ? a : b);
+    return _weatherPoints
+        .map((wp) => wp.windSpeed)
+        .reduce((a, b) => a > b ? a : b);
   }
 
   double get maxPrecipitationProbability {
     if (_weatherPoints.isEmpty) return 0;
-    return _weatherPoints.map((wp) => wp.precipitationProbability).reduce((a, b) => a > b ? a : b);
+    return _weatherPoints
+        .map((wp) => wp.precipitationProbability)
+        .reduce((a, b) => a > b ? a : b);
   }
 
   bool get hasRiskyWeather => _weatherPoints.any((wp) =>
-    wp.condition == WeatherCondition.thunderstorm ||
-    wp.condition == WeatherCondition.heavyRain ||
-    wp.condition == WeatherCondition.snow);
+      wp.condition == WeatherCondition.thunderstorm ||
+      wp.condition == WeatherCondition.heavyRain ||
+      wp.condition == WeatherCondition.snow);
 
   String? get weatherAlert {
-    if (hasRiskyWeather) return 'Na trasie występują niebezpieczne warunki pogodowe';
-    if (maxWindSpeed > 50) return '💨 Silny wiatr na trasie (${maxWindSpeed.toInt()} km/h)';
-    if (maxPrecipitationProbability > 70) return '🌧️ Wysokie prawdopodobieństwo opadów (${maxPrecipitationProbability.toInt()}%)';
+    if (hasRiskyWeather) {
+      return 'Na trasie występują niebezpieczne warunki pogodowe';
+    }
+    if (maxWindSpeed > 50) {
+      return '💨 Silny wiatr na trasie (${maxWindSpeed.toInt()} km/h)';
+    }
+    if (maxPrecipitationProbability > 70) {
+      return '🌧️ Wysokie prawdopodobieństwo opadów (${maxPrecipitationProbability.toInt()}%)';
+    }
     return null;
   }
 

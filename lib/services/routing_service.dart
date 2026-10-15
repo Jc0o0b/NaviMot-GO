@@ -5,8 +5,10 @@ import '../models/country.dart';
 import '../models/route.dart';
 import '../models/route_step.dart';
 import '../utils/country_detector.dart';
+import '../utils/route_format.dart';
 import '../utils/route_geometry.dart';
 import '../utils/scenic_route_calculator.dart';
+import 'valhalla_routing_service.dart';
 
 class RoutingService {
   static final RoutingService _instance = RoutingService._();
@@ -15,35 +17,75 @@ class RoutingService {
 
   final http.Client _client = http.Client();
 
-  String _baseUrl(bool avoidHighways) {
-    return avoidHighways
-        ? 'https://routing.openstreetmap.de/routed-car/route/v1/car'
-        : 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
-  }
+  static const String _osrmUrl =
+      'https://routing.openstreetmap.de/routed-car/route/v1/driving';
 
   Future<MotorcycleRoute> calculateRoute({
     required LatLng start,
     required LatLng end,
     List<LatLng> waypoints = const [],
     List<LatLng> intermediateWaypoints = const [],
-    bool avoidHighways = true,
     String? label,
   }) async {
     final allCoords = [start, ...waypoints, end];
-    final coordStr = allCoords.map((c) => '${c.longitude},${c.latitude}').join(';');
+    final coordStr =
+        allCoords.map((c) => '${c.longitude},${c.latitude}').join(';');
 
-    var url = '${_baseUrl(avoidHighways)}/$coordStr';
-    final params = <String>['geometries=geojson', 'overview=full', 'steps=true', 'continue_straight=false'];
-    url += '?${params.join('&')}';
+    final params = [
+      'geometries=geojson',
+      'overview=full',
+      'steps=true',
+      'continue_straight=false',
+    ];
+    final uri =
+        Uri.parse('$_osrmUrl/$coordStr?${Uri.encodeFull(params.join('&'))}');
 
-    final uri = Uri.parse(Uri.encodeFull(url));
-    final response = await _client.get(uri);
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 30));
 
-    if (response.statusCode != 200) throw Exception('OSRM error: ${response.statusCode}');
+    if (response.statusCode != 200) {
+      throw Exception('OSRM error: ${response.statusCode}');
+    }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return _parseOSRMResponse(json, allCoords,
         intermediateWaypoints: intermediateWaypoints, label: label);
+  }
+
+  /// Trasa omijająca autostrady i/lub drogi płatne (Valhalla — OSRM nie
+  /// wspiera `exclude`). Zwraca `null`, gdy się nie uda albo gdy objazd jest
+  /// rażąco gorszy niż [reference] (np. 15 h zamiast 7 h), żeby nie proponować
+  /// użytkownikowi absurdalnej trasy.
+  Future<MotorcycleRoute?> calculateRestrictedRoute({
+    required LatLng start,
+    required LatLng end,
+    List<LatLng> waypoints = const [],
+    List<LatLng> intermediateWaypoints = const [],
+    bool excludeHighways = false,
+    bool excludeTolls = false,
+    required MotorcycleRoute reference,
+    String? label,
+  }) async {
+    if (!excludeHighways && !excludeTolls) return null;
+    try {
+      final route = await ValhallaRoutingService.shared.calculateRoute(
+        start: start,
+        end: end,
+        waypoints: waypoints,
+        intermediateWaypoints: intermediateWaypoints,
+        excludeHighways: excludeHighways,
+        excludeTolls: excludeTolls,
+        label: label,
+      );
+      if (route.totalDistance > reference.totalDistance * 2.0) return null;
+      if (reference.estimatedDuration > 0 &&
+          route.estimatedDuration > reference.estimatedDuration * 1.7) {
+        return null;
+      }
+      return route;
+    } catch (_) {
+      return null;
+    }
   }
 
   MotorcycleRoute _parseOSRMResponse(
@@ -98,7 +140,6 @@ class RoutingService {
   Future<MotorcycleRoute?> avoidCountry({
     required MotorcycleRoute route,
     required String countryCode,
-    bool avoidHighways = true,
   }) async {
     if (route.waypoints.length < 2) return null;
     final country = Country.byCode(countryCode);
@@ -113,7 +154,6 @@ class RoutingService {
       end: route.waypoints.last,
       waypoints: via,
       intermediateWaypoints: route.intermediateWaypoints,
-      avoidHighways: avoidHighways,
       label: route.label == null
           ? 'Bez: ${country.name}'
           : '${route.label} · bez ${country.name}',
@@ -158,25 +198,28 @@ class RoutingService {
     List<LatLng>? scenicWaypoints,
     List<LatLng> intermediateWaypoints = const [],
   }) async {
+    // Warianty: malowniczy (z objazdami) i najszybszy. Gdy jeden zawiedzie,
+    // zwracamy drugi, żeby nie blokować planowania pojedynczym błędem.
     final results = await Future.wait([
       calculateRoute(
         start: start,
         end: end,
         waypoints: scenicWaypoints ?? waypoints,
         intermediateWaypoints: intermediateWaypoints,
-        avoidHighways: true,
         label: 'Malownicza',
-      ),
+      ).then<MotorcycleRoute?>((r) => r).catchError((_) => null),
       calculateRoute(
         start: start,
         end: end,
         waypoints: waypoints,
         intermediateWaypoints: intermediateWaypoints,
-        avoidHighways: false,
         label: 'Najszybsza',
-      ),
+      ).then<MotorcycleRoute?>((r) => r).catchError((_) => null),
     ]);
-    return results;
+
+    final ok = results.whereType<MotorcycleRoute>().toList();
+    if (ok.isEmpty) throw Exception('Nie udało się wyznaczyć żadnego wariantu');
+    return ok;
   }
 
   List<RouteStep> _parseSteps(List? legs) {
@@ -200,7 +243,8 @@ class RoutingService {
           distance: (s['distance'] as num?)?.toDouble() ?? 0,
           duration: (s['duration'] as num?)?.toDouble() ?? 0,
           geometry: coords
-              .map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+              .map((c) =>
+                  LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
               .toList(),
         ));
       }
@@ -239,7 +283,8 @@ class RoutingService {
       for (var i = 0; i < coordinates.length - 1; i++) {
         totalDist += _distanceBetween(coordinates[i], coordinates[i + 1]);
       }
-      final straightLine = _distanceBetween(coordinates.first, coordinates.last);
+      final straightLine =
+          _distanceBetween(coordinates.first, coordinates.last);
       final twistiness = totalDist / (straightLine > 0 ? straightLine : 1);
       if (twistiness > 1.5) types.add(RoadType.scenic);
     }
@@ -251,12 +296,18 @@ class RoutingService {
     return sorted;
   }
 
-  bool _isHighway(String s) => s.contains('autostrada') || RegExp(r'(^|\s)a\d+').hasMatch(s);
-  bool _isExpressway(String s) => s.contains('ekspresowa') || RegExp(r'(^|\s)s\d+').hasMatch(s);
+  bool _isHighway(String s) =>
+      s.contains('autostrada') || RegExp(r'(^|\s)a\d+').hasMatch(s);
+  bool _isExpressway(String s) =>
+      s.contains('ekspresowa') || RegExp(r'(^|\s)s\d+').hasMatch(s);
   bool _isNational(String s) =>
-      s.contains('krajowa') || RegExp(r'(^|\s)dk\d+').hasMatch(s) || RegExp(r'(^|\s)\d{1,2}\b').hasMatch(s);
+      s.contains('krajowa') ||
+      RegExp(r'(^|\s)dk\d+').hasMatch(s) ||
+      RegExp(r'(^|\s)\d{1,2}\b').hasMatch(s);
   bool _isRegional(String s) =>
-      s.contains('wojewódzka') || RegExp(r'(^|\s)dw\d+').hasMatch(s) || RegExp(r'(^|\s)\d{3}\b').hasMatch(s);
+      s.contains('wojewódzka') ||
+      RegExp(r'(^|\s)dw\d+').hasMatch(s) ||
+      RegExp(r'(^|\s)\d{3}\b').hasMatch(s);
 
   double _distanceBetween(LatLng a, LatLng b) {
     final dx = a.latitude - b.latitude;
@@ -264,10 +315,7 @@ class RoutingService {
     return (dx * dx + dy * dy).clamp(0, double.infinity);
   }
 
-  String _formatDistance(double meters) {
-    final km = meters / 1000.0;
-    return km >= 100 ? '${km.toInt()} km' : '${km.toStringAsFixed(1)} km';
-  }
+  String _formatDistance(double meters) => RouteFormat.distance(meters);
 
   void dispose() => _client.close();
 }

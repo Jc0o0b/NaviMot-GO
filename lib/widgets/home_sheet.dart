@@ -13,7 +13,8 @@ Future<void> showHomeSheet(
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (ctx) => _HomeSheet(settings: settings, onUseAsStart: onUseAsStart),
+    builder: (ctx) =>
+        _HomeSheet(settings: settings, onUseAsStart: onUseAsStart),
   );
 }
 
@@ -43,7 +44,8 @@ class _HomeSheetState extends State<_HomeSheet> {
   Widget build(BuildContext context) {
     final home = widget.settings.home;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: Column(
@@ -78,8 +80,8 @@ class _HomeSheetState extends State<_HomeSheet> {
                       if (widget.onUseAsStart != null)
                         IconButton(
                           tooltip: 'Użyj jako start',
-                          icon: const Icon(Icons.play_arrow,
-                              color: Colors.green),
+                          icon:
+                              const Icon(Icons.play_arrow, color: Colors.green),
                           onPressed: () => widget.onUseAsStart!(home),
                         ),
                       IconButton(
@@ -143,8 +145,8 @@ class _HomeSheetState extends State<_HomeSheet> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 600), () async {
-      final results = await GeocodingService.shared.search(query);
-      if (mounted) setState(() => _results = results);
+      final result = await GeocodingService.shared.search(query);
+      if (mounted) setState(() => _results = result.results);
     });
   }
 }

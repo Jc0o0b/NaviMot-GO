@@ -26,7 +26,7 @@ class RouteProvider extends ChangeNotifier {
   TravelTimeInfo? _travelTimeInfo;
   LatLng? _startLocation;
   LatLng? _endLocation;
-  List<LatLng> _intermediateWaypoints = [];
+  final List<LatLng> _intermediateWaypoints = [];
   int _planGeneration = 0;
 
   RouteProvider() {
@@ -38,13 +38,14 @@ class RouteProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   List<MotorcycleRoute> get savedRoutes => _savedRoutes;
-  List<MotorcycleRoute> get routeAlternatives => List.unmodifiable(_routeAlternatives);
-  List<RoadEvent> get routeCameras => List.unmodifiable(_routeCameras);
-  List<SpeedLimitSegment> get routeSpeedLimits => List.unmodifiable(_routeSpeedLimits);
+  List<MotorcycleRoute> get routeAlternatives => _routeAlternatives;
+  List<RoadEvent> get routeCameras => _routeCameras;
+  List<SpeedLimitSegment> get routeSpeedLimits => _routeSpeedLimits;
   TravelTimeInfo? get travelTimeInfo => _travelTimeInfo;
   LatLng? get startLocation => _startLocation;
   LatLng? get endLocation => _endLocation;
-  List<LatLng> get intermediateWaypoints => List.unmodifiable(_intermediateWaypoints);
+  List<LatLng> get intermediateWaypoints =>
+      List.unmodifiable(_intermediateWaypoints);
 
   void addWaypoint(LatLng loc) {
     final exists = _intermediateWaypoints.any((w) =>
@@ -77,7 +78,7 @@ class RouteProvider extends ChangeNotifier {
     }
   }
 
-  void planRoute(LatLng start, LatLng end) async {
+  Future<void> planRoute(LatLng start, LatLng end) async {
     final gen = ++_planGeneration;
     _isLoading = true;
     _errorMessage = null;
@@ -96,10 +97,10 @@ class RouteProvider extends ChangeNotifier {
           end: end,
           waypoints: scenicWaypoints,
           intermediateWaypoints: plainWaypoints,
-          avoidHighways: true,
         );
         if (gen != _planGeneration) return;
-        final detour = ScenicRouteCalculator.shared.suggestScenicDetour(tempRoute);
+        final detour =
+            ScenicRouteCalculator.shared.suggestScenicDetour(tempRoute);
         if (detour != null) scenicWaypoints.addAll(detour);
       }
 
@@ -113,14 +114,39 @@ class RouteProvider extends ChangeNotifier {
       if (gen != _planGeneration) return;
 
       _routeAlternatives = alternatives;
-      var chosen =
-          _routeOptions.avoidHighways ? alternatives[0] : alternatives[1];
+      // Wybieramy wariant malowniczy, gdy dostępny i preferowany.
+      var chosen = _routeOptions.avoidHighways && alternatives.length > 1
+          ? alternatives.first
+          : alternatives.last;
+
+      // Realne omijanie autostrad / dróg płatnych (Valhalla). Zachowujemy
+      // malownicze objazdy, więc ograniczenia nakładamy na wybrany wariant.
+      // Odrzucamy absurdalne objazdy na podstawie wariantu referencyjnego.
+      if (_routeOptions.avoidHighways || _routeOptions.avoidTolls) {
+        final chosenIndex = _routeAlternatives.indexOf(chosen);
+        final restricted = await RoutingService.shared.calculateRestrictedRoute(
+          start: start,
+          end: end,
+          waypoints: scenicWaypoints,
+          intermediateWaypoints: plainWaypoints,
+          excludeHighways: _routeOptions.avoidHighways,
+          excludeTolls: _routeOptions.avoidTolls,
+          reference: chosen,
+          label: chosen.label,
+        );
+        if (gen != _planGeneration) return;
+        if (restricted != null) {
+          chosen = restricted;
+          // Podmieniamy wariant w liście, aby UI podświetlało właściwy kafelek.
+          if (chosenIndex >= 0) _routeAlternatives[chosenIndex] = restricted;
+        }
+      }
+
       final skipCode = _routeOptions.skipCountryCode;
       if (skipCode != null && skipCode.isNotEmpty) {
         final avoided = await RoutingService.shared.avoidCountry(
           route: chosen,
           countryCode: skipCode,
-          avoidHighways: _routeOptions.avoidHighways,
         );
         if (gen != _planGeneration) return;
         if (avoided != null) chosen = avoided;
@@ -142,6 +168,9 @@ class RouteProvider extends ChangeNotifier {
   }
 
   void selectRoute(MotorcycleRoute route) {
+    // Unieważniamy ewentualne planowanie w toku, aby nie nadpisało wyboru.
+    _planGeneration++;
+    _isLoading = false;
     _currentRoute = route;
     _routeCameras = [];
     _routeSpeedLimits = [];
@@ -155,13 +184,15 @@ class RouteProvider extends ChangeNotifier {
 
   Future<void> _loadRouteCameras(MotorcycleRoute route) async {
     try {
-      final cameras = await CameraService.shared.camerasForRoute(route.waypoints);
+      final cameras =
+          await CameraService.shared.camerasForRoute(route.waypoints);
       if (_currentRoute?.id != route.id) return;
       _routeCameras = cameras;
       notifyListeners();
     } catch (_) {}
     try {
-      final limits = await SpeedLimitService.shared.limitsForRoute(route.waypoints);
+      final limits =
+          await SpeedLimitService.shared.limitsForRoute(route.waypoints);
       if (_currentRoute?.id != route.id) return;
       _routeSpeedLimits = limits;
       notifyListeners();

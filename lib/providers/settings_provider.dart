@@ -9,6 +9,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _nicknameKey = 'nickname';
   static const String _audioKey = 'audio_enabled';
   static const String _voiceKey = 'voice_commands';
+  static const String _keepScreenKey = 'keep_screen_on';
 
   HomeAddress? _home;
   bool _loaded = false;
@@ -16,6 +17,7 @@ class SettingsProvider extends ChangeNotifier {
   String _nickname = 'Motocyklista';
   bool _audioEnabled = true;
   bool _voiceCommands = true;
+  bool _keepScreenOn = true;
 
   HomeAddress? get home => _home;
   bool get isLoaded => _loaded;
@@ -23,6 +25,7 @@ class SettingsProvider extends ChangeNotifier {
   String get nickname => _nickname;
   bool get audioEnabled => _audioEnabled;
   bool get voiceCommands => _voiceCommands;
+  bool get keepScreenOn => _keepScreenOn;
 
   Future<void> load() async {
     try {
@@ -36,6 +39,7 @@ class SettingsProvider extends ChangeNotifier {
       _nickname = prefs.getString(_nicknameKey) ?? 'Motocyklista';
       _audioEnabled = prefs.getBool(_audioKey) ?? true;
       _voiceCommands = prefs.getBool(_voiceKey) ?? true;
+      _keepScreenOn = prefs.getBool(_keepScreenKey) ?? true;
     } catch (_) {
       _home = null;
     }
@@ -94,6 +98,15 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_voiceKey, value);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> setKeepScreenOn(bool value) async {
+    _keepScreenOn = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keepScreenKey, value);
     } catch (_) {}
     notifyListeners();
   }

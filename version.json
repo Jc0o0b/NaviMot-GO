@@ -1,6 +1,6 @@
 {
-  "version": "1.5.0",
-  "build_number": 10,
-  "changelog": "TTS na web via JS helper (naprawiono brak obsługi TTS). Poprawki UI/UX: czcionki minimalne 11-12px, padding 16px, zaokrąglone rogi 14px, usunięto deprecated withOpacity, nowoczesne bannery nawigacyjne.",
+  "version": "1.6.0",
+  "build_number": 11,
+  "changelog": "Realne omijanie autostrad i drog platnych (Valhalla). Nowe ustawienie: nie wylaczaj ekranu podczas nawigacji. Wyszukiwanie miejsc: osobny debounce i czytelne bledy dla kazdego pola. Poprawki stabilnosci (zabezpieczenia async, izolacja danych pogody i miejsc). Wydajnosc: cache ciezkich obliczen trasy, szybsze przewijanie czatu, mniej zbednych przebudowan. Refaktoryzacja: wspoldzielone formatowanie tras i ikony pogody.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

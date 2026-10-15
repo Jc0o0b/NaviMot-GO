@@ -7,8 +7,10 @@ import '../providers/route_provider.dart';
 import '../providers/weather_provider.dart';
 import '../providers/poi_provider.dart';
 import '../utils/gmx_download.dart';
+import '../utils/route_format.dart';
 import '../widgets/offline_route_preview.dart';
 import '../widgets/section_header.dart';
+import '../widgets/weather_icon.dart';
 
 class SavedRoutesScreen extends StatelessWidget {
   const SavedRoutesScreen({super.key});
@@ -128,8 +130,7 @@ class SavedRoutesScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _exportRoute(
-      BuildContext context, MotorcycleRoute route) async {
+  Future<void> _exportRoute(BuildContext context, MotorcycleRoute route) async {
     final choice = await showModalBottomSheet<_GmxExportAction>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -175,8 +176,8 @@ class SavedRoutesScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _confirmDelete(
-      BuildContext context, RouteProvider routeVM, MotorcycleRoute route) async {
+  Future<void> _confirmDelete(BuildContext context, RouteProvider routeVM,
+      MotorcycleRoute route) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -203,16 +204,10 @@ class SavedRoutesScreen extends StatelessWidget {
     }
   }
 
-  String _formatDistance(double meters) {
-    final km = meters / 1000.0;
-    return km >= 100 ? '${km.toInt()} km' : '${km.toStringAsFixed(1)} km';
-  }
+  String _formatDistance(double meters) => RouteFormat.distance(meters);
 
-  String _formatDuration(double seconds) {
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    return h > 0 ? '${h}h ${m}min' : '${m} min';
-  }
+  String _formatDuration(double seconds) =>
+      RouteFormat.durationCompact(seconds.round());
 }
 
 enum _GmxExportAction { link, file }
@@ -226,193 +221,221 @@ class _RouteDetailScreen extends StatefulWidget {
 }
 
 class _RouteDetailScreenState extends State<_RouteDetailScreen> {
+  late final WeatherProvider _weatherProvider;
+  late final POIProvider _poiProvider;
+
   @override
   void initState() {
     super.initState();
-    final weatherVM = context.read<WeatherProvider>();
-    final poiVM = context.read<POIProvider>();
-    weatherVM.loadWeather(widget.route);
-    poiVM.loadPOIs(widget.route);
+    // Lokalne providery — bez zaśmiecania globalnego stanu mapy (wcześniej
+    // pogoda i miejsca zapisanej trasy nadpisywały dane planowanej trasy).
+    _weatherProvider = WeatherProvider()..loadWeather(widget.route);
+    _poiProvider = POIProvider()..loadPOIs(widget.route);
+  }
+
+  @override
+  void dispose() {
+    _weatherProvider.dispose();
+    _poiProvider.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.route.name)),
-      body: Consumer2<WeatherProvider, POIProvider>(
-        builder: (context, weatherVM, poiVM, _) {
-          final eventsVM = context.watch<EventsProvider>();
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // Offline preview (bez kafli mapy - działa bez internetu)
-              SizedBox(
-                height: 200,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    OfflineRoutePreview(
-                      route: widget.route,
-                      events: eventsVM.events,
-                      places: eventsVM.importantPlaces,
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.cloud_off,
-                                size: 14, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('Dostępne offline',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Stats
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<WeatherProvider>.value(value: _weatherProvider),
+        ChangeNotifierProvider<POIProvider>.value(value: _poiProvider),
+      ],
+      child: Scaffold(
+        appBar: AppBar(title: Text(widget.route.name)),
+        body: Consumer2<WeatherProvider, POIProvider>(
+          builder: (context, weatherVM, poiVM, _) {
+            final eventsVM = context.watch<EventsProvider>();
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Offline preview (bez kafli mapy - działa bez internetu)
+                SizedBox(
+                  height: 200,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      const Text('Szczegóły trasy',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _statBox(
-                              Icons.straighten,
-                              _formatDistance(widget.route.totalDistance),
-                              'Dystans'),
-                          const SizedBox(width: 8),
-                          _statBox(
-                              Icons.schedule,
-                              _formatDuration(
-                                  PolishTrafficRegulations.shared
-                                      .calculateTravelTime(
-                                          widget.route.totalDistance,
-                                          widget.route.roadTypes)
-                                      .drivingTime),
-                              'Czas'),
-                        ],
+                      OfflineRoutePreview(
+                        route: widget.route,
+                        events: eventsVM.events,
+                        places: eventsVM.importantPlaces,
                       ),
-                      if (widget.route.roadTypes.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        const Text('Rodzaje dróg:',
-                            style: TextStyle(fontSize: 12, color: Colors.grey)),
-                        ...widget.route.roadTypes.map((t) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Text(t.label,
-                                  style: const TextStyle(fontSize: 12)),
-                            )),
-                      ],
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cloud_off,
+                                  size: 14, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text('Dostępne offline',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Weather
-              if (weatherVM.weatherPoints.isNotEmpty)
+                // Stats
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Pogoda na trasie',
+                        const Text('Szczegóły trasy',
                             style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 60,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: weatherVM.weatherPoints
-                                .map((wp) => Container(
-                                      width: 50,
-                                      margin: const EdgeInsets.only(right: 4),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.wb_sunny,
-                                              size: 16, color: Colors.yellow),
-                                          Text('${wp.temperature.toInt()}°',
-                                              style: const TextStyle(
-                                                  fontSize: 10)),
-                                        ],
-                                      ),
-                                    ))
-                                .toList(),
-                          ),
+                                fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _statBox(
+                                Icons.straighten,
+                                _formatDistance(widget.route.totalDistance),
+                                'Dystans'),
+                            const SizedBox(width: 8),
+                            _statBox(
+                                Icons.schedule,
+                                _formatDuration(PolishTrafficRegulations.shared
+                                    .calculateTravelTime(
+                                        widget.route.totalDistance,
+                                        widget.route.roadTypes)
+                                    .drivingTime),
+                                'Czas'),
+                          ],
                         ),
+                        if (widget.route.roadTypes.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const Text('Rodzaje dróg:',
+                              style:
+                                  TextStyle(fontSize: 12, color: Colors.grey)),
+                          ...widget.route.roadTypes.map((t) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 2),
+                                child: Text(t.label,
+                                    style: const TextStyle(fontSize: 12)),
+                              )),
+                        ],
                       ],
                     ),
                   ),
                 ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // POIs
-              if (poiVM.pointsOfInterest.isNotEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Miejsca do odwiedzenia',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        ...poiVM.pointsOfInterest.take(5).map((poi) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.pin_drop,
-                                      size: 16, color: Colors.orange),
-                                  const SizedBox(width: 8),
-                                  Text(poi.name,
-                                      style: const TextStyle(fontSize: 13)),
-                                  const Spacer(),
-                                  Text(poi.category.label,
-                                      style: const TextStyle(
-                                          fontSize: 11, color: Colors.grey)),
-                                ],
-                              ),
-                            )),
-                      ],
+                // Weather
+                if (weatherVM.weatherPoints.isNotEmpty)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Pogoda na trasie',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 60,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: weatherVM.weatherPoints
+                                  .map((wp) => Container(
+                                        width: 50,
+                                        margin: const EdgeInsets.only(right: 4),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .surfaceContainerHighest,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                                WeatherIconWidget.iconFor(
+                                                    wp.condition),
+                                                size: 16,
+                                                color:
+                                                    WeatherIconWidget.colorFor(
+                                                        wp.condition)),
+                                            Text('${wp.temperature.toInt()}°',
+                                                style: const TextStyle(
+                                                    fontSize: 10)),
+                                          ],
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
-          );
-        },
+                const SizedBox(height: 16),
+
+                // POIs
+                if (poiVM.pointsOfInterest.isNotEmpty)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Miejsca do odwiedzenia',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          ...poiVM.pointsOfInterest
+                              .take(5)
+                              .map((poi) => Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.pin_drop,
+                                            size: 16, color: Colors.orange),
+                                        const SizedBox(width: 8),
+                                        Text(poi.name,
+                                            style:
+                                                const TextStyle(fontSize: 13)),
+                                        const Spacer(),
+                                        Text(poi.category.label,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey)),
+                                      ],
+                                    ),
+                                  )),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -440,14 +463,8 @@ class _RouteDetailScreenState extends State<_RouteDetailScreen> {
     );
   }
 
-  String _formatDistance(double meters) {
-    final km = meters / 1000.0;
-    return km >= 100 ? '${km.toInt()} km' : '${km.toStringAsFixed(1)} km';
-  }
+  String _formatDistance(double meters) => RouteFormat.distance(meters);
 
-  String _formatDuration(double seconds) {
-    final h = seconds ~/ 3600;
-    final m = (seconds % 3600) ~/ 60;
-    return h > 0 ? '${h}h ${m}min' : '${m} min';
-  }
+  String _formatDuration(double seconds) =>
+      RouteFormat.durationCompact(seconds.round());
 }

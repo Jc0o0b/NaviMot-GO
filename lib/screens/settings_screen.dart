@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -17,11 +18,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _checkingUpdate = false;
   UpdateInfo? _updateInfo;
   String _currentVersion = '';
+  Timer? _nicknameDebounce;
 
   @override
   void initState() {
     super.initState();
     _loadVersion();
+  }
+
+  @override
+  void dispose() {
+    _nicknameDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _onNicknameChanged(String value) {
+    _nicknameDebounce?.cancel();
+    _nicknameDebounce = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) context.read<SettingsProvider>().setNickname(value);
+    });
   }
 
   Future<void> _loadVersion() async {
@@ -79,8 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.deepOrange),
                   title: const Text('Tryb ciemny (Dark Mode)',
                       style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle:
-                      const Text('Ciemny motyw ułatwia czytanie w nocy'),
+                  subtitle: const Text('Ciemny motyw ułatwia czytanie w nocy'),
                   value: settings.darkMode,
                   onChanged: (v) => settings.setDarkMode(v),
                 ),
@@ -112,6 +126,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ? (v) => settings.setVoiceCommands(v)
                           : null,
                     ),
+                    const Divider(height: 1, indent: 56),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.screen_lock_portrait_outlined,
+                          color: Colors.deepOrange),
+                      title: const Text('Nie wyłączaj ekranu',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text(
+                          'Ekran pozostaje włączony podczas nawigacji'),
+                      value: settings.keepScreenOn,
+                      onChanged: (v) => settings.setKeepScreenOn(v),
+                    ),
                   ],
                 ),
               ),
@@ -119,8 +144,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const _SectionLabel('Twój profil'),
               Card(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -130,8 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               color: Colors.deepOrange, size: 20),
                           SizedBox(width: 8),
                           Text('Pseudonim na czacie',
-                              style:
-                                  TextStyle(fontWeight: FontWeight.w600)),
+                              style: TextStyle(fontWeight: FontWeight.w600)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -142,8 +166,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
-                        onFieldSubmitted: (v) => settings.setNickname(v),
-                        onChanged: (v) => settings.setNickname(v),
+                        onFieldSubmitted: (v) {
+                          _nicknameDebounce?.cancel();
+                          settings.setNickname(v);
+                        },
+                        onChanged: _onNicknameChanged,
                       ),
                     ],
                   ),
@@ -169,8 +196,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w800)),
                     Text('Wersja $_currentVersion',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.grey)),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey)),
                     const SizedBox(height: 16),
                     const Divider(height: 1),
                     ListTile(
@@ -185,12 +212,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1),
                     const ListTile(
-                      leading: Icon(Icons.person_outline,
-                          color: Colors.deepOrange),
+                      leading:
+                          Icon(Icons.person_outline, color: Colors.deepOrange),
                       title: Text('Twórca aplikacji',
                           style: TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text(
-                          'Jc0o0b — pasjonat motocykli i programowania'),
+                      subtitle:
+                          Text('Jc0o0b — pasjonat motocykli i programowania'),
                     ),
                   ],
                 ),
@@ -212,8 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     if (_updateInfo != null) {
       return ListTile(
-        leading: const Icon(Icons.system_update_alt,
-            color: Colors.green),
+        leading: const Icon(Icons.system_update_alt, color: Colors.green),
         title: Text('Nowa wersja: ${_updateInfo!.version}',
             style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(_updateInfo!.changelog.isNotEmpty
@@ -224,8 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
     return ListTile(
-      leading:
-          const Icon(Icons.update, color: Colors.deepOrange),
+      leading: const Icon(Icons.update, color: Colors.deepOrange),
       title: const Text('Sprawdź aktualizacje',
           style: TextStyle(fontWeight: FontWeight.w600)),
       subtitle: const Text('Pobierz najnowszą wersję aplikacji'),
@@ -239,8 +264,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       applicationName: 'NaviMot GO',
       applicationVersion: _currentVersion,
-      applicationIcon: const Icon(Icons.motorcycle,
-          size: 48, color: Colors.deepOrange),
+      applicationIcon:
+          const Icon(Icons.motorcycle, size: 48, color: Colors.deepOrange),
       applicationLegalese:
           'Nawigacja i malownicze trasy motocyklowe z pogodą, miejscami dla motocyklisty, '
           'wspólnotą i zgłoszeniami od społeczności.\n\n'

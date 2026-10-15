@@ -22,6 +22,7 @@ import '../services/traffic_service.dart';
 import '../services/wake_lock_service.dart';
 import '../services/weather_service.dart';
 import '../services/web_tts_service.dart';
+import '../utils/route_format.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart';
 import '../widgets/traffic_overlay.dart';
@@ -50,6 +51,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   bool _demoMode = false;
   double _simAlong = 0;
   double _simSpeedMs = 0;
+  late SettingsProvider _settings;
 
   static const double _rerouteThresholdMeters = 200;
   static const Duration _rerouteCooldown = Duration(seconds: 10);
@@ -96,19 +98,19 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _nextStepIndex = _nextMeaningfulStepIndex();
     _remainingDistance = _totalDistance;
     _remainingDuration = PolishTrafficRegulations.shared
-        .calculateTravelTime(
-            _route.totalDistance, _route.roadTypes)
+        .calculateTravelTime(_route.totalDistance, _route.roadTypes)
         .drivingTime;
     _initTts();
     _startTracking();
-    _acquireWakeLock();
+    _settings = context.read<SettingsProvider>();
+    _settings.addListener(_applyWakeLock);
+    _applyWakeLock();
     _loadRouteWeather();
   }
 
   void _loadRouteWeather() {
     WeatherService.shared
-        .fetchWeatherAlongRoute(_route.waypoints,
-            startTime: DateTime.now())
+        .fetchWeatherAlongRoute(_route.waypoints, startTime: DateTime.now())
         .then((points) {
       if (!mounted) return;
       setState(() => _routeWeather = points);
@@ -116,13 +118,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
           wp.condition == WeatherCondition.thunderstorm ||
           wp.condition == WeatherCondition.heavyRain ||
           wp.condition == WeatherCondition.snow);
-      if (hasDanger) {
+      if (hasDanger && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Na trasie występują niebezpieczne warunki pogodowe'),
           duration: Duration(seconds: 4),
         ));
       }
-    });
+    }).catchError((_) {});
   }
 
   void _recomputeRouteCache() {
@@ -139,17 +141,24 @@ class _NavigationScreenState extends State<NavigationScreen> {
     } catch (_) {}
   }
 
+  void _applyWakeLock() {
+    if (_settings.keepScreenOn) {
+      _acquireWakeLock();
+    } else {
+      WakeLockService.shared.release();
+    }
+  }
+
   Future<void> _initTts() async {
     if (kIsWeb) {
       await WebTtsService.shared.init();
+      if (!mounted) return;
       if (!WebTtsService.shared.isSupported) {
-        _ttsFailed = true;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-            duration: Duration(seconds: 5),
-          ));
-        }
+        setState(() => _ttsFailed = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+          duration: Duration(seconds: 5),
+        ));
         return;
       }
     } else {
@@ -160,13 +169,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
         await tts.setVolume(1.0);
         _tts = tts;
       } catch (e) {
-        _ttsFailed = true;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
-            duration: const Duration(seconds: 5),
-          ));
-        }
+        if (!mounted) return;
+        setState(() => _ttsFailed = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Brak obsługi TTS — nawigacja głosowa niedostępna'),
+          duration: Duration(seconds: 5),
+        ));
         return;
       }
     }
@@ -182,21 +190,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
     _spokenStepIndex = 0;
   }
 
-  Future<void> _activateTts() async {
-    _speakFirstInstruction();
-    if (mounted) setState(() {});
-  }
-
   Future<void> _startTracking() async {
     _simFallbackTimer = Timer(const Duration(seconds: 10), _maybeEnterDemo);
     LatLng? location;
     try {
       location = await LocationService.getCurrentLocation();
     } catch (_) {}
-    if (location != null && mounted) {
+    if (!mounted) return;
+    if (location != null) {
       _handleInitialPosition(location);
     }
-    bool streamOk = false;
     try {
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -204,11 +207,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
           distanceFilter: 5,
         ),
       ).listen(_onPosition, onError: (_) {});
-      streamOk = true;
-    } catch (_) {}
-    if (!streamOk && _currentLocation == null) {
-      _simFallbackTimer?.cancel();
-      _startSimulation();
+    } catch (_) {
+      if (!mounted) return;
+      if (_currentLocation == null) {
+        _simFallbackTimer?.cancel();
+        _startSimulation();
+      }
     }
   }
 
@@ -337,8 +341,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final along = _distanceAlong(loc);
     _remainingDistance = max(0, _totalDistance - along);
     final totalTravel = PolishTrafficRegulations.shared
-        .calculateTravelTime(_route.totalDistance,
-            _route.roadTypes)
+        .calculateTravelTime(_route.totalDistance, _route.roadTypes)
         .drivingTime;
     _remainingDuration = _totalDistance > 0
         ? totalTravel * (_remainingDistance / _totalDistance)
@@ -434,7 +437,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
     var nearestDist = double.infinity;
     for (final wp in _routeWeather) {
       if (!rainConditions.contains(wp.condition) &&
-          wp.precipitationProbability < 50) continue;
+          wp.precipitationProbability < 50) {
+        continue;
+      }
       final dist = _distanceAlong(wp.coordinate) - along;
       if (dist < -200 || dist > 5000) continue;
       if (dist < nearestDist) {
@@ -443,8 +448,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
       }
     }
     _upcomingRain = nearestRain;
-    _upcomingRainDistance =
-        nearestDist == double.infinity ? double.infinity : max(0.0, nearestDist);
+    _upcomingRainDistance = nearestDist == double.infinity
+        ? double.infinity
+        : max(0.0, nearestDist);
     if (nearestRain == null || nearestDist == double.infinity) return;
     if (nearestDist > 2000) return;
     final key =
@@ -458,8 +464,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   ? 'opady śniegu'
                   : 'opady deszczu';
       final prob = nearestRain.precipitationProbability.round();
-      _speak(
-          'Uwaga, za ${_formatDistance(nearestDist)} $label na trasie, '
+      _speak('Uwaga, za ${_formatDistance(nearestDist)} $label na trasie, '
           'prawdopodobieństwo $prob procent');
     }
   }
@@ -471,19 +476,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (now.difference(_lastReroute) < _rerouteCooldown) return;
     _lastReroute = now;
     final dest = _route.waypoints.last;
-    _doReroute(real, dest, true);
+    _doReroute(real, dest);
   }
 
-  Future<void> _doReroute(
-      LatLng origin, LatLng destination, bool avoidHighways) async {
+  Future<void> _doReroute(LatLng origin, LatLng destination) async {
     if (_rerouting) return;
     setState(() => _rerouting = true);
     try {
-      final result = await RoutingService.shared.calculateRoute(
-        start: origin,
-        end: destination,
-        avoidHighways: avoidHighways,
-      );
+      final result = await RoutingService.shared
+          .calculateRoute(start: origin, end: destination)
+          .timeout(const Duration(seconds: 15));
       _handleRerouteResult(origin, result);
     } catch (_) {
       _maybeRerouteFailed();
@@ -526,7 +528,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (!mounted) return;
     setState(() => _rerouting = false);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Nie udało się wyznaczyć objazdu — trwa nawigacja po starej trasie'),
+      content: Text(
+          'Nie udało się wyznaczyć objazdu — trwa nawigacja po starej trasie'),
       duration: Duration(seconds: 3),
     ));
   }
@@ -597,6 +600,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
       _tts?.stop();
     }
     WakeLockService.shared.release();
+    _settings.removeListener(_applyWakeLock);
     _mapController.dispose();
     super.dispose();
   }
@@ -609,8 +613,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
       ...context.watch<EventsProvider>().events,
     ];
     final speedLimits = routeProvider.routeSpeedLimits;
-    final trafficSegments = TrafficService.shared
-        .trafficAlongRoute(_route.waypoints, events);
+    final trafficSegments =
+        TrafficService.shared.trafficAlongRoute(_route.waypoints, events);
     return Scaffold(
       body: Stack(
         children: [
@@ -618,8 +622,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter:
-                    _currentLocation ?? _route.waypoints.first,
+                initialCenter: _currentLocation ?? _route.waypoints.first,
                 initialZoom: 16,
                 onMapReady: () {
                   _mapReady = true;
@@ -638,11 +641,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate:
-                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.motorcycle.routes',
-                  tileProvider:
-                      widget.tileProvider ?? NetworkTileProvider(),
+                  tileProvider: widget.tileProvider ?? NetworkTileProvider(),
                 ),
                 if (_route.waypoints.length > 1) ...[
                   PolylineLayer(
@@ -707,8 +708,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: Colors.red, width: 2.5),
+                                border:
+                                    Border.all(color: Colors.red, width: 2.5),
                                 boxShadow: const [
                                   BoxShadow(
                                       color: Colors.black26, blurRadius: 3),
@@ -740,8 +741,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         point: _route.waypoints.last,
                         width: 32,
                         height: 32,
-                        child: const Icon(Icons.flag,
-                            color: Colors.red, size: 28),
+                        child:
+                            const Icon(Icons.flag, color: Colors.red, size: 28),
                       ),
                     ],
                   ),
@@ -764,8 +765,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                       color: Colors.black38, blurRadius: 4),
                                 ],
                               ),
-                              child:
-                                  const Icon(Icons.place, size: 18, color: Colors.blue),
+                              child: const Icon(Icons.place,
+                                  size: 18, color: Colors.blue),
                             ),
                           ),
                       ],
@@ -852,8 +853,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       SizedBox(
                           width: 18,
                           height: 18,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2)),
+                          child: CircularProgressIndicator(strokeWidth: 2)),
                       SizedBox(width: 12),
                       Text('Wyznaczam objazd...',
                           style: TextStyle(fontWeight: FontWeight.bold)),
@@ -973,10 +973,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
         wp.condition == WeatherCondition.heavyRain;
     final hasStorm = wp.condition == WeatherCondition.thunderstorm;
     final hasSnow = wp.condition == WeatherCondition.snow;
-    final color =
-        hasStorm ? Colors.purple[700]! : hasSnow ? Colors.blue[700]! : Colors.blue[600]!;
-    final icon =
-        hasStorm ? Icons.thunderstorm : hasSnow ? Icons.snowing : Icons.water_drop;
+    final color = hasStorm
+        ? Colors.purple[700]!
+        : hasSnow
+            ? Colors.blue[700]!
+            : Colors.blue[600]!;
+    final icon = hasStorm
+        ? Icons.thunderstorm
+        : hasSnow
+            ? Icons.snowing
+            : Icons.water_drop;
     final label = hasStorm
         ? 'Burza'
         : hasSnow
@@ -999,7 +1005,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
           Expanded(
             child: Text(
               '$label za ${_formatDistance(_upcomingRainDistance)} '
-              '(${prob}%)',
+              '($prob%)',
               style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -1023,8 +1029,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final min = (_remainingDuration / 60).round();
     final timeText =
         min >= 60 ? 'ok. ${min ~/ 60}h ${min % 60}min' : 'ok. $min min';
-    final arrival = DateTime.now()
-        .add(Duration(seconds: _remainingDuration.toInt()));
+    final arrival =
+        DateTime.now().add(Duration(seconds: _remainingDuration.toInt()));
     final arrivalText = 'Przyjazd ok. '
         '${arrival.hour.toString().padLeft(2, '0')}:'
         '${arrival.minute.toString().padLeft(2, '0')}';
@@ -1059,12 +1065,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           style: TextStyle(fontSize: 11, color: Colors.grey)),
                       if (_demoMode)
                         const Text('Tryb demo',
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.deepOrange)),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.deepOrange)),
                       if (_ttsFailed)
                         const Text('TTS niedostępne',
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.red)),
+                            style: TextStyle(fontSize: 11, color: Colors.red)),
                     ],
                   ),
                 ),
@@ -1077,7 +1082,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           style: TextStyle(
                               fontSize: distSize, fontWeight: FontWeight.bold)),
                       Text(timeText,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey)),
                       Text(arrivalText,
                           style: const TextStyle(
                               fontSize: 12,
@@ -1246,8 +1252,5 @@ class _NavigationScreenState extends State<NavigationScreen> {
     return cum;
   }
 
-  String _formatDistance(double meters) {
-    final km = meters / 1000.0;
-    return km >= 100 ? '${km.round()} km' : '${km.toStringAsFixed(1)} km';
-  }
+  String _formatDistance(double meters) => RouteFormat.shortDistance(meters);
 }

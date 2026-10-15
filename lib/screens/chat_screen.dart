@@ -45,8 +45,7 @@ class _VoivodeshipTile extends StatelessWidget {
         ? 'Wspólne przejazdy w ${voivodeship.name.toLowerCase()}'
         : '${last.author}: ${last.text}';
     return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         child: Icon(Icons.motorcycle,
@@ -83,6 +82,7 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  int _lastMessageCount = 0;
 
   @override
   void dispose() {
@@ -115,7 +115,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget build(BuildContext context) {
     final chatVM = context.watch<ChatProvider>();
     final messages = chatVM.messagesFor(widget.voivodeship.id);
-    _scrollToBottom();
+    // Przewijamy tylko, gdy doszły nowe wiadomości — nie przy każdym
+    // przebudowaniu (wcześniej build() wymuszał skok na dół ekranu).
+    if (messages.length != _lastMessageCount) {
+      _lastMessageCount = messages.length;
+      _scrollToBottom();
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text('Czat ${widget.voivodeship.name}'),
