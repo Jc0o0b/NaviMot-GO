@@ -60,6 +60,32 @@ class RouteGeometry {
     return bestAlong;
   }
 
+  /// Sanity-check geometrii trasy z routera.
+  ///
+  /// Zwraca `false`, gdy wyglądają na zdegenerowane: za mało punktów,
+  /// współrzędne poza światem albo długość nijak mająca się do dystansu
+  /// z API. Bez tego zdegenerowana odpowiedź zamieniała się w „trasę po
+  /// liniach prostych" z absurdalnym dystansem rzędu milionów kilometrów.
+  static bool looksSane(List<LatLng> points, double apiDistanceMeters) {
+    if (points.length < 2) return false;
+    for (final p in points) {
+      if (!p.latitude.isFinite || !p.longitude.isFinite) return false;
+      if (p.latitude.abs() > 90.0 || p.longitude.abs() > 180.0) return false;
+    }
+    if (!apiDistanceMeters.isFinite || apiDistanceMeters <= 0) return true;
+
+    // Długość policzona z geometrii musi być w tym samym rzędzie wielkości
+    // co dystans z API (trasa może się wijać, ale nie 4× więcej).
+    final looseUpper = apiDistanceMeters * 4 + 100000;
+    var sum = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      sum += haversine(points[i - 1], points[i]);
+      if (sum > looseUpper) return false;
+    }
+    if (sum < apiDistanceMeters * 0.25) return false;
+    return true;
+  }
+
   /// Zmniejsza liczbę punktów do co najwyżej [target] (np. do rysowania).
   static List<LatLng> decimate(List<LatLng> pts, int target) {
     if (pts.length <= target) return pts;

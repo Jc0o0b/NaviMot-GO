@@ -148,8 +148,8 @@ class ValhallaRoutingService {
     final distance = ((summary['length'] as num?)?.toDouble() ?? 0) * 1000;
     final duration = (summary['time'] as num?)?.toDouble() ?? 0;
 
-    if (coordinates.length < 2) {
-      throw Exception('Valhalla: pusta geometria trasy');
+    if (!RouteGeometry.looksSane(coordinates, distance)) {
+      throw Exception('Valhalla: podejrzana geometria trasy');
     }
 
     final roadTypes = _classifyRoadTypes(coordinates, roadNames);

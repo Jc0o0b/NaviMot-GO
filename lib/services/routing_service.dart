@@ -112,6 +112,11 @@ class RoutingService {
 
     final distance = (route['distance'] as num?)?.toDouble() ?? 0;
     final duration = (route['duration'] as num?)?.toDouble() ?? 0;
+
+    if (!RouteGeometry.looksSane(coordinates, distance)) {
+      throw Exception('OSRM: podejrzana geometria trasy');
+    }
+
     final roadTypes = _classifyRoadTypes(coordinates, legs);
     final steps = _parseSteps(legs);
 

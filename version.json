@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
-  "build_number": 13,
-  "changelog": "Wybierany kolor akcentu (6 kolorow) - dopasuj aplikacje do siebie. Uproszczony ekran mapy: szczegoly trasy chowane pod rozwijana sekcja. Prostszy ekran planowania: preferencje zwijane, akcja Wyznacz trasę na gorze. Kolor akcentu uzywany w calej aplikacji zamiast sztywnego pomaranczowego.",
+  "version": "2.1.1",
+  "build_number": 14,
+  "changelog": "Naprawa wyznaczania tras: weryfikacja geometrii z routera (OSRM/Valhalla). Zdegenerowana odpowiedz (linie proste i absurdalny dystans rzędu milionow km) jest odrzucana, zamiast trafiać na mape i do nawigacji. Trasy ponownie prowadza po drogach.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

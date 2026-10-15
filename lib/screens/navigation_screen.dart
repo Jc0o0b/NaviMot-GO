@@ -129,9 +129,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   void _recomputeRouteCache() {
     _waypointCumulative = _cumulativeDistances(_route.waypoints);
-    _totalDistance = _waypointCumulative.isNotEmpty
-        ? _waypointCumulative.last
-        : _route.totalDistance;
+    final summed =
+        _waypointCumulative.isNotEmpty ? _waypointCumulative.last : 0.0;
+    final api = _route.totalDistance;
+    // Gdy geometria jest zdegenerowana (linie proste + absurdalny dystans),
+    // ufamy dystansowi z API zamiast sumie po zdegenerowanych punktach.
+    final sane = RouteGeometry.looksSane(_route.waypoints, api);
+    _totalDistance = (sane && summed > 0) ? summed : (api > 0 ? api : summed);
     _stepCumulative = _computeStepCumulative(_route.steps);
   }
 
