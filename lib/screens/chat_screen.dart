@@ -194,6 +194,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   isDense: true,
                 ),
                 textCapitalization: TextCapitalization.sentences,
+                maxLength: 1000,
+                buildCounter: (_, {required currentLength, maxLength, required isFocused}) =>
+                    const SizedBox.shrink(),
                 onSubmitted: (_) => _send(),
               ),
             ),

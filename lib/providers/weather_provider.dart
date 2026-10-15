@@ -32,6 +32,7 @@ class WeatherProvider extends ChangeNotifier {
     }).catchError((e) {
       if (_disposed || gen != _generation) return;
       _errorMessage = 'Nie udało się pobrać pogody: $e';
+      _weatherPoints = [];
       _isLoading = false;
       notifyListeners();
     });

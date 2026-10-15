@@ -3,7 +3,7 @@ import 'package:web/web.dart' as web;
 import '../models/route.dart';
 import 'gmx_builder.dart';
 
-void downloadGmx(MotorcycleRoute route) {
+Future<bool> downloadGmx(MotorcycleRoute route) async {
   final content = GmxBuilder.buildGmx(route);
   final blob = web.Blob(
     [content.toJS].toJS,
@@ -13,9 +13,10 @@ void downloadGmx(MotorcycleRoute route) {
   final anchor = web.HTMLAnchorElement()
     ..href = url
     ..download =
-        '${route.name.replaceAll(RegExp(r'[^\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]'), '_')}.gmx';
+        '${route.name.replaceAll(RegExp(r'[^\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]'), '_')}.gpx';
   web.document.body?.appendChild(anchor);
   anchor.click();
   anchor.remove();
   web.URL.revokeObjectURL(url);
+  return true;
 }

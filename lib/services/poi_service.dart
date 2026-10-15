@@ -16,14 +16,12 @@ class POIService {
   static const List<String> _endpoints = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
     'https://z.overpass-api.de/api/interpreter',
     'https://lz4.overpass-api.de/api/interpreter',
     'https://overpass-api.de/api/interpreter',
   ];
   static const Duration _timeout = Duration(seconds: 30);
-  static const String _userAgent =
-      'NaviMot-GO/1.0 (+https://github.com/Jc0o0b/NaviMot-GO)';
+  static const String _userAgent = 'NaviMot-GO/1.1';
 
   final http.Client _client = http.Client();
 

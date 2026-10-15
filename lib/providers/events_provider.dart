@@ -45,17 +45,35 @@ class EventsProvider extends ChangeNotifier {
   List<RoadEvent> _readEvents(SharedPreferences prefs) {
     final raw = prefs.getString(_eventsKey);
     if (raw == null || raw.isEmpty) return [];
-    return (jsonDecode(raw) as List)
-        .map((e) => RoadEvent.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.whereType<Map<String, dynamic>>().map((e) {
+        try {
+          return RoadEvent.fromJson(e);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<RoadEvent>().toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   List<ImportantPlace> _readPlaces(SharedPreferences prefs) {
     final raw = prefs.getString(_placesKey);
     if (raw == null || raw.isEmpty) return [];
-    return (jsonDecode(raw) as List)
-        .map((e) => ImportantPlace.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final list = jsonDecode(raw) as List;
+      return list.whereType<Map<String, dynamic>>().map((e) {
+        try {
+          return ImportantPlace.fromJson(e);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<ImportantPlace>().toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> addRoadEvent({

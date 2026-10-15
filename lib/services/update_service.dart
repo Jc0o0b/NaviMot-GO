@@ -53,8 +53,15 @@ class UpdateService {
     }
   }
 
+  static const String _allowedApkHost = 'jc0o0b.github.io';
+
   Future<void> openUpdate(UpdateInfo info) async {
-    final uri = Uri.parse(info.apkUrl);
+    final uri = Uri.tryParse(info.apkUrl);
+    if (uri == null) return;
+    final isSafe = uri.scheme == 'https' &&
+        uri.host == _allowedApkHost &&
+        uri.path.toLowerCase().endsWith('.apk');
+    if (!isSafe) return;
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

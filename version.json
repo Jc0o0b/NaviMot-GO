@@ -1,6 +1,6 @@
 {
-  "version": "2.1.1",
-  "build_number": 14,
-  "changelog": "Naprawa wyznaczania tras: weryfikacja geometrii z routera (OSRM/Valhalla). Zdegenerowana odpowiedz (linie proste i absurdalny dystans rzÄ™du milionow km) jest odrzucana, zamiast trafiaÄ‡ na mape i do nawigacji. Trasy ponownie prowadza po drogach.",
+  "version": "2.1.2",
+  "build_number": 15,
+  "changelog": "Audyt bezpieczeñstwa i stabilnoœci.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

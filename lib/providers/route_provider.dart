@@ -232,7 +232,15 @@ class RouteProvider extends ChangeNotifier {
       if (raw != null && raw.isNotEmpty) {
         final list = jsonDecode(raw) as List;
         _savedRoutes = list
-            .map((e) => MotorcycleRoute.fromJson(e as Map<String, dynamic>))
+            .whereType<Map<String, dynamic>>()
+            .map((e) {
+              try {
+                return MotorcycleRoute.fromJson(e);
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<MotorcycleRoute>()
             .toList();
         notifyListeners();
       }

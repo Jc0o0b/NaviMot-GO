@@ -631,10 +631,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Zgłoszone przez użytkowników oraz dane live traffic',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
+                       const Text(
+                         'Twoje zgłoszenia oraz dane z OpenStreetMap',
+                         style: TextStyle(fontSize: 11, color: Colors.grey),
+                       ),
               const SizedBox(height: 8),
               for (final e in nearEvents.take(6))
                 Padding(
@@ -682,10 +682,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Miejsca zgłoszone przez innych użytkowników',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
+                       const Text(
+                         'Twoje zapisane miejsca w pobliżu trasy',
+                         style: TextStyle(fontSize: 11, color: Colors.grey),
+                       ),
               const SizedBox(height: 8),
               for (final p in nearPlaces.take(5))
                 Padding(

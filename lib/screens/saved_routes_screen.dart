@@ -161,6 +161,12 @@ class SavedRoutesScreen extends StatelessWidget {
       ),
     );
     if (choice == null || !context.mounted) return;
+    if (route.waypoints.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ta trasa nie ma punktów do wyeksportowania')),
+      );
+      return;
+    }
     switch (choice) {
       case _GmxExportAction.link:
         await copyGmxLink(route);
@@ -170,10 +176,13 @@ class SavedRoutesScreen extends StatelessWidget {
               content: Text('Link do trasy GPX skopiowany do schowka')),
         );
       case _GmxExportAction.file:
-        downloadGmx(route);
+        final downloaded = await downloadGmx(route);
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pobrano plik GPX: ${route.name}.gpx')),
+          SnackBar(
+              content: Text(downloaded
+                  ? 'Pobrano plik GPX: ${route.name}.gpx'
+                  : 'Link GPX skopiowany do schowka (zapisz go w przeglądarce)')),
         );
     }
   }

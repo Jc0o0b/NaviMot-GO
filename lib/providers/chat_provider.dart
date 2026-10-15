@@ -44,9 +44,17 @@ class ChatProvider extends ChangeNotifier {
         for (final v in voivodeships) {
           final list = data[v.id];
           if (list is List) {
-            _messages[v.id] = list
-                .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
-                .toList();
+            final out = <ChatMessage>[];
+            for (final e in list) {
+              if (e is Map<String, dynamic>) {
+                try {
+                  out.add(ChatMessage.fromJson(e));
+                } catch (_) {}
+              }
+            }
+            _messages[v.id] = out;
+          } else {
+            _messages[v.id] = [];
           }
         }
       }
@@ -61,12 +69,13 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> send(String voivodeshipId, String author, String text) async {
+    await load();
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     final list = _messages[voivodeshipId] ??= [];
     list.add(ChatMessage(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
-      author: author.trim().isEmpty ? 'Motocyklista' : author,
+      author: author.trim().isEmpty ? 'Motocyklista' : author.trim(),
       text: trimmed,
       time: DateTime.now(),
       mine: true,

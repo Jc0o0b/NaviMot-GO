@@ -478,6 +478,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (realToRoute <= _rerouteThresholdMeters) return;
     final now = DateTime.now();
     if (now.difference(_lastReroute) < _rerouteCooldown) return;
+    if (_route.waypoints.isEmpty) return;
     _lastReroute = now;
     final dest = _route.waypoints.last;
     _doReroute(real, dest);
@@ -574,6 +575,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final steps = _route.steps;
     if (steps.isEmpty || _nextStepIndex >= steps.length) return _heading;
     final pts = _route.waypoints;
+    if (pts.isEmpty) return _heading;
     final targetIdx = (_nextStepIndex * pts.length / max(steps.length, 1))
         .round()
         .clamp(0, pts.length - 1);
@@ -629,7 +631,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: _currentLocation ?? _route.waypoints.first,
+                initialCenter: _currentLocation ??
+                    (_route.waypoints.isNotEmpty
+                        ? _route.waypoints.first
+                        : const LatLng(52.2297, 21.0122)),
                 initialZoom: 16,
                 onMapReady: () {
                   _mapReady = true;
@@ -735,24 +740,25 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           ),
                       ],
                     ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _route.waypoints.first,
-                        width: 32,
-                        height: 32,
-                        child: const Icon(Icons.motorcycle,
-                            color: Colors.green, size: 28),
-                      ),
-                      Marker(
-                        point: _route.waypoints.last,
-                        width: 32,
-                        height: 32,
-                        child:
-                            const Icon(Icons.flag, color: Colors.red, size: 28),
-                      ),
-                    ],
-                  ),
+                  if (_route.waypoints.isNotEmpty)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _route.waypoints.first,
+                          width: 32,
+                          height: 32,
+                          child: const Icon(Icons.motorcycle,
+                              color: Colors.green, size: 28),
+                        ),
+                        Marker(
+                          point: _route.waypoints.last,
+                          width: 32,
+                          height: 32,
+                          child: const Icon(Icons.flag,
+                              color: Colors.red, size: 28),
+                        ),
+                      ],
+                    ),
                   if (_route.intermediateWaypoints.isNotEmpty)
                     MarkerLayer(
                       markers: [
@@ -887,7 +893,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                 foregroundColor: Colors.white,
                 onPressed: () => showEventReportSheet(
                   context,
-                  fallbackLocation: _currentLocation ?? _route.waypoints.first,
+                  fallbackLocation: _currentLocation ??
+                      (_route.waypoints.isNotEmpty
+                          ? _route.waypoints.first
+                          : const LatLng(52.2297, 21.0122)),
                 ),
                 child: const Icon(Icons.warning_amber_rounded),
               ),

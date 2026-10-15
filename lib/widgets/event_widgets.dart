@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,15 @@ import '../models/important_place.dart';
 import '../models/road_event.dart';
 import '../providers/events_provider.dart';
 import '../services/location_service.dart';
+
+Uint8List? _tryDecodeBase64(String? data) {
+  if (data == null || data.isEmpty) return null;
+  try {
+    return base64Decode(data);
+  } catch (_) {
+    return null;
+  }
+}
 
 IconData eventIcon(RoadEventType type) {
   switch (type) {
@@ -111,8 +121,8 @@ Future<void> showEventReportSheet(
               const Text('Zgłoś na drodze',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              const Text('Wydarzenie będzie widoczne dla innych na mapie.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('Wydarzenie pojawi się na Twojej mapie i w ostrzeżeniach.',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 12),
               for (final type in RoadEventType.values)
                 _ReportRow(
@@ -246,6 +256,13 @@ class _ImportantPlaceFormState extends State<_ImportantPlaceForm> {
       if (file == null) return;
       final bytes = await file.readAsBytes();
       if (!mounted) return;
+      if (bytes.length > 700000) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Zdjęcie jest za duże, wybierz mniejsze'),
+          duration: Duration(seconds: 2),
+        ));
+        return;
+      }
       setState(() => _photoBase64 = base64Encode(bytes));
     } catch (_) {}
   }
@@ -274,6 +291,7 @@ class _ImportantPlaceFormState extends State<_ImportantPlaceForm> {
 
   @override
   Widget build(BuildContext context) {
+    final photoBytes = _tryDecodeBase64(_photoBase64);
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -289,7 +307,7 @@ class _ImportantPlaceFormState extends State<_ImportantPlaceForm> {
             const Text('Ważne miejsce',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text('Miejsce warte uwagi dla innych motocyklistów.',
+            const Text('Twoje własne miejsce na mapie.',
                 style: TextStyle(fontSize: 12, color: Colors.grey)),
             const SizedBox(height: 16),
             TextField(
@@ -300,6 +318,9 @@ class _ImportantPlaceFormState extends State<_ImportantPlaceForm> {
                 border: OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.sentences,
+              maxLength: 60,
+              buildCounter: (_, {required currentLength, maxLength, required isFocused}) =>
+                  const SizedBox.shrink(),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -312,21 +333,24 @@ class _ImportantPlaceFormState extends State<_ImportantPlaceForm> {
               ),
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
+              maxLength: 300,
+              buildCounter: (_, {required currentLength, maxLength, required isFocused}) =>
+                  const SizedBox.shrink(),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _pickPhoto,
               icon: const Icon(Icons.photo_camera_outlined),
-              label: Text(_photoBase64 == null
+              label: Text(photoBytes == null
                   ? 'Dodaj zdjęcie'
                   : 'Zmień zdjęcie'),
             ),
-            if (_photoBase64 != null) ...[
+            if (photoBytes != null) ...[
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.memory(
-                  base64Decode(_photoBase64!),
+                  photoBytes,
                   height: 160,
                   fit: BoxFit.cover,
                 ),
@@ -430,6 +454,7 @@ Future<void> showImportantPlaceDetail(
     isScrollControlled: true,
     builder: (ctx) {
       final eventsVM = context.read<EventsProvider>();
+      final photoBytes = _tryDecodeBase64(place.photoBase64);
       return SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -454,12 +479,12 @@ Future<void> showImportantPlaceDetail(
               const SizedBox(height: 4),
               Text('Dodano: ${_formatTime(place.createdAt)}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              if (place.photoBase64 != null) ...[
+              if (photoBytes != null) ...[
                 const SizedBox(height: 12),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.memory(
-                    base64Decode(place.photoBase64!),
+                    photoBytes,
                     height: 220,
                     fit: BoxFit.cover,
                   ),

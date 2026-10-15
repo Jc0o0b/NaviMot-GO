@@ -14,6 +14,11 @@ class GmxBuilder {
           '  xsi:schemaLocation="$_namespace http://www.topografix.com/GPX/1/0/gpx.xsd"')
       ..writeln('  version="1.0" creator="NaviMot GO">');
 
+    if (pts.isEmpty) {
+      buf.writeln('</gpx>');
+      return buf.toString();
+    }
+
     buf.writeln(_waypoint(pts.first, 'Start'));
     for (var i = 1; i < pts.length - 1; i++) {
       buf.writeln(_waypoint(pts[i], 'Punkt trasy ${i + 1}'));
@@ -56,7 +61,7 @@ class GmxBuilder {
       final idx = (i * (pts.length - 1) / (maxPoints - 1)).round();
       result.add(pts[idx]);
     }
-    result.add(pts.last);
+    if (result.last != pts.last) result.add(pts.last);
     return result;
   }
 

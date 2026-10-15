@@ -191,16 +191,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 8),
                       TextFormField(
                         initialValue: settings.nickname,
-                        decoration: const InputDecoration(
-                          hintText: 'Twój pseudonim',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onFieldSubmitted: (v) {
-                          _nicknameDebounce?.cancel();
-                          settings.setNickname(v);
-                        },
-                        onChanged: _onNicknameChanged,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                          maxLength: 20,
+                          buildCounter: (_, {required currentLength, maxLength, required isFocused}) =>
+                              const SizedBox.shrink(),
+                      onFieldSubmitted: (v) {
+                        _nicknameDebounce?.cancel();
+                        settings.setNickname(v);
+                      },
+                      onChanged: _onNicknameChanged,
                       ),
                     ],
                   ),
@@ -232,21 +235,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ListTile(
                       leading:
                           Icon(Icons.info_outline, color: scheme.primary),
-                      title: const Text('O aplikacji',
+                      title: const Text('O aplikacji i twórcy',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text(
-                          'Co potrafi NaviMot GO i jak z niego korzystać'),
+                          'Co potrafi NaviMot GO, z czego korzysta i kto za nim stoi'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _showAbout(context),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading:
-                          Icon(Icons.person_outline, color: scheme.primary),
-                      title: const Text('Twórca aplikacji',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: const Text(
-                          'Jc0o0b — pasjonat motocykli i programowania'),
                     ),
                   ],
                 ),
@@ -356,22 +350,131 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAbout(BuildContext context) {
-    showAboutDialog(
+    final scheme = Theme.of(context).colorScheme;
+    final bodyTheme = Theme.of(context).textTheme;
+
+    Widget sectionTitle(String text) => Padding(
+          padding: const EdgeInsets.only(top: 18, bottom: 6),
+          child: Text(text,
+              style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: scheme.primary)),
+        );
+
+    Widget bullet(String text) => Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Icon(Icons.check_circle,
+                    size: 14, color: scheme.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(text, style: bodyTheme.bodyMedium)),
+            ],
+          ),
+        );
+
+    showDialog<void>(
       context: context,
-      applicationName: 'NaviMot GO',
-      applicationVersion: _currentVersion,
-      applicationIcon: Icon(Icons.motorcycle,
-          size: 48, color: Theme.of(context).colorScheme.primary),
-      applicationLegalese:
-          'Nawigacja i malownicze trasy motocyklowe z pogodą, miejscami dla motocyklisty, '
-          'wspólnotą i zgłoszeniami od społeczności.\n\n'
-          'Aplikacja została stworzona z myślą o motocyklistach, którzy lubią odkrywać '
-          'piękne drogi i dzielić się nimi z innymi.\n\nAutor: Jc0o0b',
-      children: const [
-        SizedBox(height: 8),
-        Text(
-            'NaviMot GO używa otwartych danych mapowych oraz usług wyznaczania tras.'),
-      ],
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.motorcycle,
+                              size: 40, color: scheme.primary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('NaviMot GO',
+                                    style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800)),
+                                Text('Wersja $_currentVersion',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nawigacja i planer tras stworzony z myślą o motocyklistach. '
+                        'Zamiast zawsze najszybciej — szuka dróg malowniczych: krętych, '
+                        'z widokami i ciekawymi miejscami po drodze.',
+                        style: bodyTheme.bodyMedium,
+                      ),
+
+                      sectionTitle('Co potrafi'),
+                      bullet('Wyznaczanie tras motocyklowych — warianty malowniczy i najszybszy'),
+                      bullet('Realne omijanie autostrad i dróg płatnych'),
+                      bullet('Nawigacja głosowa z ostrzeżeniami o zdarzeniach na drodze'),
+                      bullet('Fotoradary i ograniczenia prędkości na trasie'),
+                      bullet('Pogoda na trasie i alerty o niebezpiecznych warunkach'),
+                      bullet('Miejsca dla motocyklistów: punkty widokowe, przełęcze, stacje, serwisy'),
+                      bullet('Zgłoszenia społeczności — wypadki, remonty, niebezpieczeństwa'),
+                      bullet('Zapis tras, udostępnianie i eksport GPX'),
+                      bullet('Przystanki po drodze i kolejność postojów'),
+                      bullet('Tryb słońca (wysoki kontrast) i blokada ekranu podczas jazdy'),
+
+                      sectionTitle('Z jakich danych korzysta'),
+                      Text(
+                        'Mapy i miejsca: OpenStreetMap (Overpass API). '
+                        'Wyznaczanie tras: OSRM oraz Valhalla. '
+                        'Wyszukiwanie adresów: Photon i Nominatim. '
+                        'Pogoda: Open-Meteo. '
+                        'Aktualizacje: repozytorium aplikacji.\n\n'
+                        'Wszystkie usługi są otwarte i darmowe. Aplikacja nie wymaga '
+                        'konta ani rejestracji, a dane o trasach i zgłoszeniach '
+                        'przechowywane są lokalnie na Twoim urządzeniu.',
+                        style: bodyTheme.bodyMedium,
+                      ),
+
+                      sectionTitle('Twórca'),
+                      Text(
+                         'NaviMot GO powstało z pasji do motocykli i programowania. '
+                         'Celem jest jeżdżenie pięknymi drogami i dzielenie się nimi '
+                         'z innymi motocyklistami.\n\n'
+                         'Twórca: NaviMot GO. Pomysły, błędy i sugestie mile widziane '
+                         'w repozytorium aplikacji.',
+                        style: bodyTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Zamknij'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
