@@ -60,15 +60,19 @@ class _HomeSheetState extends State<_HomeSheet> {
             if (home != null) ...[
               const SizedBox(height: 12),
               Card(
-                color: Colors.orange.shade50,
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.08),
                 margin: EdgeInsets.zero,
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.home,
-                          color: Colors.deepOrange, size: 20),
+                      Icon(Icons.home,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(home.name,

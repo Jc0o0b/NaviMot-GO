@@ -609,6 +609,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   Widget build(BuildContext context) {
     // Reagujemy na zmianę motywu / rozmiaru napisów bez opuszczania nawigacji.
     context.watch<SettingsProvider>();
+    final scheme = Theme.of(context).colorScheme;
     final routeProvider = context.watch<RouteProvider>();
     final events = [
       ...routeProvider.routeCameras,
@@ -657,7 +658,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       ),
                       Polyline(
                         points: RouteGeometry.decimate(_route.waypoints, 1200),
-                        color: Colors.deepOrange,
+                        color: scheme.primary,
                         strokeWidth: 4,
                       ),
                     ],
@@ -786,13 +787,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: Colors.deepOrange, width: 2.5),
+                                color: scheme.primary, width: 2.5),
                             boxShadow: const [
                               BoxShadow(color: Colors.black45, blurRadius: 5),
                             ],
                           ),
-                          child: const Icon(Icons.motorcycle,
-                              color: Colors.deepOrange, size: 22),
+                          child: Icon(Icons.motorcycle,
+                              color: scheme.primary, size: 22),
                         ),
                       ),
                     ],
@@ -878,7 +879,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
               child: FloatingActionButton.small(
                 heroTag: 'nav-report-event',
                 tooltip: 'Zgłoś wydarzenie na drodze',
-                backgroundColor: Colors.deepOrange,
+                backgroundColor: scheme.primary,
                 foregroundColor: Colors.white,
                 onPressed: () => showEventReportSheet(
                   context,
@@ -912,7 +913,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
       ),
       child: Row(
         children: [
-          Icon(_arrowFor(step), size: big ? 52 : 44, color: Colors.deepOrange),
+          Icon(_arrowFor(step), size: big ? 52 : 44, color: scheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1077,7 +1078,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                           style: TextStyle(
                               fontSize: speedSize,
                               fontWeight: FontWeight.w800,
-                              color: Colors.deepOrange)),
+                              color: scheme.primary)),
                       Text('Prędkość',
                           style: TextStyle(
                               fontSize: labelSize,
@@ -1086,8 +1087,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       if (_demoMode)
                         Text('Tryb demo',
                             style: TextStyle(
-                                fontSize: labelSize,
-                                color: Colors.deepOrange)),
+                                fontSize: labelSize, color: scheme.primary)),
                       if (_ttsFailed)
                         Text('TTS niedostępne',
                             style:
@@ -1112,7 +1112,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       Text(arrivalText,
                           style: TextStyle(
                               fontSize: subSize,
-                              color: Colors.deepOrange,
+                              color: scheme.primary,
                               fontWeight: FontWeight.w700)),
                     ],
                   ),

@@ -1,9 +1,28 @@
 import 'dart:convert';
+import 'package:flutter/material.dart' show Color;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/home_address.dart';
 
 class SettingsProvider extends ChangeNotifier {
+  /// Dostępne kolory akcentu (kolejność = kolejność na liście w UI).
+  static const List<Color> accentColors = [
+    Color(0xFFFF5722), // pomarańczowy (domyślny)
+    Color(0xFF1E88E5), // niebieski
+    Color(0xFF43A047), // zielony
+    Color(0xFF8E24AA), // fioletowy
+    Color(0xFFE53935), // czerwony
+    Color(0xFF00897B), // morski
+  ];
+  static const List<String> accentNames = [
+    'Pomarańczowy',
+    'Niebieski',
+    'Zielony',
+    'Fioletowy',
+    'Czerwony',
+    'Morski',
+  ];
+
   static const String _homeKey = 'home_address';
   static const String _darkKey = 'dark_mode';
   static const String _nicknameKey = 'nickname';
@@ -12,6 +31,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _keepScreenKey = 'keep_screen_on';
   static const String _highContrastKey = 'high_contrast';
   static const String _bigNavFontKey = 'big_nav_font';
+  static const String _accentKey = 'accent_index';
 
   HomeAddress? _home;
   bool _loaded = false;
@@ -22,6 +42,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _keepScreenOn = true;
   bool _highContrast = false;
   bool _bigNavFont = false;
+  int _accentIndex = 0;
 
   HomeAddress? get home => _home;
   bool get isLoaded => _loaded;
@@ -32,6 +53,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get keepScreenOn => _keepScreenOn;
   bool get highContrast => _highContrast;
   bool get bigNavFont => _bigNavFont;
+  int get accentIndex => _accentIndex;
+  Color get accentColor =>
+      accentColors[_accentIndex.clamp(0, accentColors.length - 1)];
 
   Future<void> load() async {
     try {
@@ -48,6 +72,7 @@ class SettingsProvider extends ChangeNotifier {
       _keepScreenOn = prefs.getBool(_keepScreenKey) ?? true;
       _highContrast = prefs.getBool(_highContrastKey) ?? false;
       _bigNavFont = prefs.getBool(_bigNavFontKey) ?? false;
+      _accentIndex = prefs.getInt(_accentKey) ?? 0;
     } catch (_) {
       _home = null;
     }
@@ -133,6 +158,15 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_bigNavFontKey, value);
+    } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> setAccentIndex(int value) async {
+    _accentIndex = value.clamp(0, accentColors.length - 1);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_accentKey, _accentIndex);
     } catch (_) {}
     notifyListeners();
   }

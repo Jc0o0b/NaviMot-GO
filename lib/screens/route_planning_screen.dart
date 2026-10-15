@@ -109,9 +109,10 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         icon: const Icon(Icons.gps_fixed, size: 18),
                         label: const Text('Aktualna lokalizacja'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.deepOrange,
-                          side: const BorderSide(
-                              color: Colors.deepOrange, width: 1.5),
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 1.5),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -180,8 +181,6 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         _buildStopList(routeVM),
                       ],
                       const SizedBox(height: 24),
-                      _buildOptions(routeVM),
-                      const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: (routeVM.startLocation != null &&
                                 routeVM.endLocation != null)
@@ -197,6 +196,8 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      _buildOptions(routeVM),
                       if (routeVM.isLoading) ...[
                         const SizedBox(height: 16),
                         const Center(child: CircularProgressIndicator()),
@@ -249,7 +250,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 label: const Text('Dom',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.deepOrange,
+                  foregroundColor: Theme.of(context).colorScheme.primary,
                   visualDensity: VisualDensity.compact,
                 ),
               ),
@@ -344,14 +345,21 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
 
   Widget _buildOptions(RouteProvider routeVM) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          leading: Icon(Icons.tune,
+              color: Theme.of(context).colorScheme.primary),
+          title: const Text('Preferencje trasy',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          subtitle: const Text('Autostrady, kręte drogi, malownicze objazdy',
+              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          shape: const Border(),
+          collapsedShape: const Border(),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+          childrenPadding: const EdgeInsets.only(bottom: 8),
           children: [
-            const Text('Preferencje trasy',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
             SwitchListTile(
               title: const Text('Unikaj autostrad'),
               subtitle: const Text('Bardziej malownicze drogi'),
@@ -380,49 +388,53 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
               },
             ),
             const Divider(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.public, color: Colors.deepOrange, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Pomiń kraj na trasie',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text('Omijaj wybrany kraj, przez który przebiega trasa',
-                          style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<String?>(
-                  value: routeVM.routeOptions.skipCountryCode,
-                  underline: const SizedBox.shrink(),
-                  icon: const Icon(Icons.arrow_drop_down),
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('Brak'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.public,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pomiń kraj na trasie',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Omijaj wybrany kraj, przez który przebiega trasa',
+                            style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ],
                     ),
-                    for (final c in Country.all)
-                      DropdownMenuItem<String?>(
-                        value: c.code,
-                        child: Text(c.name),
+                  ),
+                  const SizedBox(width: 8),
+                  DropdownButton<String?>(
+                    value: routeVM.routeOptions.skipCountryCode,
+                    underline: const SizedBox.shrink(),
+                    icon: const Icon(Icons.arrow_drop_down),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Brak'),
                       ),
-                  ],
-                  onChanged: (code) {
-                    routeVM.routeOptions.skipCountryCode = code;
-                    routeVM.setRouteOptions(routeVM.routeOptions);
-                    final start = routeVM.startLocation;
-                    final end = routeVM.endLocation;
-                    if (code != null && start != null && end != null) {
-                      setState(() => _navigateOnReady = false);
-                      routeVM.planRoute(start, end);
-                    }
-                  },
-                ),
-              ],
+                      for (final c in Country.all)
+                        DropdownMenuItem<String?>(
+                          value: c.code,
+                          child: Text(c.name),
+                        ),
+                    ],
+                    onChanged: (code) {
+                      routeVM.routeOptions.skipCountryCode = code;
+                      routeVM.setRouteOptions(routeVM.routeOptions);
+                      final start = routeVM.startLocation;
+                      final end = routeVM.endLocation;
+                      if (code != null && start != null && end != null) {
+                        setState(() => _navigateOnReady = false);
+                        routeVM.planRoute(start, end);
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -501,14 +513,15 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.alarm, size: 15, color: Colors.deepOrange),
+                Icon(Icons.alarm,
+                    size: 15, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 6),
                 Text(
                   'Przyjazd ok. ${PolishTrafficRegulations.shared.calculateTravelTime(route.totalDistance, route.roadTypes).formattedArrival()}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Colors.deepOrange),
+                      color: Theme.of(context).colorScheme.primary),
                 ),
               ],
             ),
@@ -573,7 +586,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                     icon: const Icon(Icons.navigation, size: 18),
                     label: const Text('Start'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),

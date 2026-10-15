@@ -7,15 +7,16 @@ class POIMarkerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.deepOrange, width: 1.5),
+        border: Border.all(color: primary, width: 1.5),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 2)],
       ),
-      child: Icon(_icon(), color: Colors.deepOrange, size: 20),
+      child: Icon(_icon(), color: primary, size: 20),
     );
   }
 

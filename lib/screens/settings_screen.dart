@@ -84,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
+          final scheme = Theme.of(context).colorScheme;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -92,8 +93,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     SwitchListTile(
-                      secondary: const Icon(Icons.dark_mode_outlined,
-                          color: Colors.deepOrange),
+                      secondary:
+                          Icon(Icons.dark_mode_outlined, color: scheme.primary),
                       title: const Text('Tryb ciemny (Dark Mode)',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle:
@@ -103,8 +104,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile(
-                      secondary: const Icon(Icons.wb_sunny_outlined,
-                          color: Colors.deepOrange),
+                      secondary:
+                          Icon(Icons.wb_sunny_outlined, color: scheme.primary),
                       title: const Text('Tryb słońca (wysoki kontrast)',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text(
@@ -112,6 +113,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: settings.highContrast,
                       onChanged: (v) => settings.setHighContrast(v),
                     ),
+                    const Divider(height: 1, indent: 56),
+                    _buildAccentPicker(settings),
                   ],
                 ),
               ),
@@ -121,8 +124,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     SwitchListTile(
-                      secondary: const Icon(Icons.volume_up_outlined,
-                          color: Colors.deepOrange),
+                      secondary:
+                          Icon(Icons.volume_up_outlined, color: scheme.primary),
                       title: const Text('Dźwięk',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text('Włącz dźwięk w aplikacji'),
@@ -131,8 +134,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile(
-                      secondary: const Icon(Icons.record_voice_over_outlined,
-                          color: Colors.deepOrange),
+                      secondary: Icon(Icons.record_voice_over_outlined,
+                          color: scheme.primary),
                       title: const Text('Komunikaty głosowe',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle:
@@ -144,8 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile(
-                      secondary: const Icon(Icons.screen_lock_portrait_outlined,
-                          color: Colors.deepOrange),
+                      secondary: Icon(Icons.screen_lock_portrait_outlined,
+                          color: scheme.primary),
                       title: const Text('Nie wyłączaj ekranu',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text(
@@ -155,8 +158,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1, indent: 56),
                     SwitchListTile(
-                      secondary: const Icon(Icons.format_size_outlined,
-                          color: Colors.deepOrange),
+                      secondary:
+                          Icon(Icons.format_size_outlined, color: scheme.primary),
                       title: const Text('Duże napisy nawigacji',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text(
@@ -176,12 +179,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(Icons.badge_outlined,
-                              color: Colors.deepOrange, size: 20),
-                          SizedBox(width: 8),
-                          Text('Pseudonim na czacie',
+                              color: scheme.primary, size: 20),
+                          const SizedBox(width: 8),
+                          const Text('Pseudonim na czacie',
                               style: TextStyle(fontWeight: FontWeight.w600)),
                         ],
                       ),
@@ -216,8 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     const SizedBox(height: 16),
-                    const Icon(Icons.motorcycle,
-                        size: 48, color: Colors.deepOrange),
+                    Icon(Icons.motorcycle, size: 48, color: scheme.primary),
                     const SizedBox(height: 8),
                     const Text('NaviMot GO',
                         style: TextStyle(
@@ -228,8 +230,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 16),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const Icon(Icons.info_outline,
-                          color: Colors.deepOrange),
+                      leading:
+                          Icon(Icons.info_outline, color: scheme.primary),
                       title: const Text('O aplikacji',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text(
@@ -238,13 +240,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: () => _showAbout(context),
                     ),
                     const Divider(height: 1),
-                    const ListTile(
+                    ListTile(
                       leading:
-                          Icon(Icons.person_outline, color: Colors.deepOrange),
-                      title: Text('Twórca aplikacji',
+                          Icon(Icons.person_outline, color: scheme.primary),
+                      title: const Text('Twórca aplikacji',
                           style: TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle:
-                          Text('Jc0o0b — pasjonat motocykli i programowania'),
+                      subtitle: const Text(
+                          'Jc0o0b — pasjonat motocykli i programowania'),
                     ),
                   ],
                 ),
@@ -277,7 +279,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
     return ListTile(
-      leading: const Icon(Icons.update, color: Colors.deepOrange),
+      leading:
+          Icon(Icons.update, color: Theme.of(context).colorScheme.primary),
       title: const Text('Sprawdź aktualizacje',
           style: TextStyle(fontWeight: FontWeight.w600)),
       subtitle: const Text('Pobierz najnowszą wersję aplikacji'),
@@ -286,13 +289,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildAccentPicker(SettingsProvider settings) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.palette_outlined, color: scheme.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text('Kolor akcentu',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (var i = 0; i < SettingsProvider.accentColors.length; i++)
+                _accentDot(
+                  color: SettingsProvider.accentColors[i],
+                  name: SettingsProvider.accentNames[i],
+                  selected: settings.accentIndex == i,
+                  outline: scheme.onSurface,
+                  onTap: () => settings.setAccentIndex(i),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _accentDot({
+    required Color color,
+    required String name,
+    required bool selected,
+    required Color outline,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: name,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? outline : Colors.transparent,
+              width: 3,
+            ),
+          ),
+          child: selected
+              ? const Icon(Icons.check, color: Colors.white, size: 22)
+              : null,
+        ),
+      ),
+    );
+  }
+
   void _showAbout(BuildContext context) {
     showAboutDialog(
       context: context,
       applicationName: 'NaviMot GO',
       applicationVersion: _currentVersion,
-      applicationIcon:
-          const Icon(Icons.motorcycle, size: 48, color: Colors.deepOrange),
+      applicationIcon: Icon(Icons.motorcycle,
+          size: 48, color: Theme.of(context).colorScheme.primary),
       applicationLegalese:
           'Nawigacja i malownicze trasy motocyklowe z pogodą, miejscami dla motocyklisty, '
           'wspólnotą i zgłoszeniami od społeczności.\n\n'
@@ -317,8 +386,11 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+        style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
       ),
     );
   }

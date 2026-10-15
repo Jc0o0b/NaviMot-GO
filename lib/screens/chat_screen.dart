@@ -201,7 +201,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             FloatingActionButton.small(
               heroTag: 'chat-send',
               onPressed: _send,
-              backgroundColor: Colors.deepOrange,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
               child: const Icon(Icons.send),
             ),
@@ -230,7 +230,7 @@ class _MessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.78,
         ),
         decoration: BoxDecoration(
-          color: mine ? Colors.deepOrange : scheme.surfaceContainerHighest,
+          color: mine ? scheme.primary : scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(14),
             topRight: const Radius.circular(14),

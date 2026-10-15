@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "build_number": 12,
-  "changelog": "Tryb slonca: wysokiego kontrastu interfejs czytelny w pelnym sloncu. Wieksze napisy nawigacji (wskazowki i predkosc). Uproszczony, czytelniejszy ekran jazdy. Nowe opcje personalizacji w Ustawieniach.",
+  "version": "2.1.0",
+  "build_number": 13,
+  "changelog": "Wybierany kolor akcentu (6 kolorow) - dopasuj aplikacje do siebie. Uproszczony ekran mapy: szczegoly trasy chowane pod rozwijana sekcja. Prostszy ekran planowania: preferencje zwijane, akcja Wyznacz trasę na gorze. Kolor akcentu uzywany w calej aplikacji zamiast sztywnego pomaranczowego.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

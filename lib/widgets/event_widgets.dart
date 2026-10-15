@@ -52,7 +52,8 @@ class RoadEventMarker extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: selected ? Colors.deepOrange : color, width: 2),
+            color: selected ? Theme.of(context).colorScheme.primary : color,
+            width: 2),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 5)],
       ),
       child: Icon(eventIcon(type), color: color, size: 28),
@@ -71,7 +72,10 @@ class ImportantPlaceMarker extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
         border: Border.all(
-            color: selected ? Colors.deepOrange : Colors.amber, width: 2.5),
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.amber,
+            width: 2.5),
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 5)],
       ),
       child: const Icon(Icons.star, color: Colors.amber, size: 28),

@@ -23,11 +23,15 @@ class MoreScreen extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.15),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.forum,
-                          color: Colors.deepOrange, size: 22),
+                      child: Icon(Icons.forum,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 22),
                     ),
                     title: const Text('Czat',
                         style: TextStyle(fontWeight: FontWeight.bold)),
@@ -45,11 +49,15 @@ class MoreScreen extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.15),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.settings,
-                          color: Colors.deepOrange, size: 22),
+                      child: Icon(Icons.settings,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 22),
                     ),
                     title: const Text('Ustawienia',
                         style: TextStyle(fontWeight: FontWeight.bold)),

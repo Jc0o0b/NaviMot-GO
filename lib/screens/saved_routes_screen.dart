@@ -143,13 +143,15 @@ class SavedRoutesScreen extends StatelessWidget {
             ),
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.link, color: Colors.deepOrange),
+              leading: Icon(Icons.link,
+                  color: Theme.of(context).colorScheme.primary),
               title: const Text('Kopiuj link do trasy'),
               subtitle: const Text('Odbiorca otworzy link w przeglądarce'),
               onTap: () => Navigator.of(ctx).pop(_GmxExportAction.link),
             ),
             ListTile(
-              leading: const Icon(Icons.download, color: Colors.deepOrange),
+              leading: Icon(Icons.download,
+                  color: Theme.of(context).colorScheme.primary),
               title: const Text('Pobierz plik .gpx'),
               subtitle: const Text('Zapisz plik i wyślij go np. e-mailem'),
               onTap: () => Navigator.of(ctx).pop(_GmxExportAction.file),

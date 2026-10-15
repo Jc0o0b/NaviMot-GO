@@ -45,12 +45,16 @@ class NavimotGoApp extends StatelessWidget {
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
         final hc = settings.highContrast;
+        final accent = settings.accentColor;
         return MaterialApp(
           title: 'NaviMot GO',
           debugShowCheckedModeBanner: false,
-          theme: hc ? _highContrastTheme(Brightness.light) : _lightTheme(),
-          darkTheme:
-              hc ? _highContrastTheme(Brightness.dark) : _darkTheme(),
+          theme: hc
+              ? _highContrastTheme(Brightness.light, accent)
+              : _lightTheme(accent),
+          darkTheme: hc
+              ? _highContrastTheme(Brightness.dark, accent)
+              : _darkTheme(accent),
           themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
           home: const SplashScreen(),
         );
@@ -58,10 +62,10 @@ class NavimotGoApp extends StatelessWidget {
     );
   }
 
-  ThemeData _lightTheme() {
+  ThemeData _lightTheme(Color accent) {
     final base = ThemeData(
       brightness: Brightness.light,
-      colorSchemeSeed: Colors.deepOrange,
+      colorSchemeSeed: accent,
       useMaterial3: true,
       fontFamily: 'Montserrat',
     );
@@ -83,7 +87,7 @@ class NavimotGoApp extends StatelessWidget {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: const Color(0x33FF5722),
+        indicatorColor: accent.withValues(alpha: 0.2),
         elevation: 8,
         height: 60,
         labelTextStyle: WidgetStateProperty.all(
@@ -105,10 +109,10 @@ class NavimotGoApp extends StatelessWidget {
     );
   }
 
-  ThemeData _darkTheme() {
+  ThemeData _darkTheme(Color accent) {
     final base = ThemeData(
       brightness: Brightness.dark,
-      colorSchemeSeed: Colors.deepOrange,
+      colorSchemeSeed: accent,
       useMaterial3: true,
       fontFamily: 'Montserrat',
     );
@@ -130,7 +134,7 @@ class NavimotGoApp extends StatelessWidget {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: const Color(0xFF1D2023),
         surfaceTintColor: Colors.transparent,
-        indicatorColor: const Color(0x55FF5722),
+        indicatorColor: accent.withValues(alpha: 0.33),
         elevation: 8,
         height: 60,
         labelTextStyle: WidgetStateProperty.all(
@@ -153,7 +157,7 @@ class NavimotGoApp extends StatelessWidget {
   }
 
   /// Motyw wysokiego kontrastu („Tryb słońca”) — czytelny w pełnym słońcu.
-  ThemeData _highContrastTheme(Brightness brightness) {
+  ThemeData _highContrastTheme(Brightness brightness, Color accent) {
     final isLight = brightness == Brightness.light;
     final bg = isLight ? Colors.white : Colors.black;
     final surface = isLight ? Colors.white : const Color(0xFF0E0E0E);
@@ -162,7 +166,7 @@ class NavimotGoApp extends StatelessWidget {
 
     final base = ThemeData(
       brightness: brightness,
-      colorSchemeSeed: Colors.deepOrange,
+      colorSchemeSeed: accent,
       useMaterial3: true,
       fontFamily: 'Montserrat',
     );
@@ -193,7 +197,7 @@ class NavimotGoApp extends StatelessWidget {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: const Color(0x55FF5722),
+        indicatorColor: accent.withValues(alpha: 0.33),
         elevation: 8,
         height: 64,
         labelTextStyle: WidgetStateProperty.all(

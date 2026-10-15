@@ -126,13 +126,13 @@ class _MapScreenState extends State<MapScreen>
                   if (_animDone)
                     Polyline(
                       points: _decimatedFor(route),
-                      color: Colors.deepOrange,
+                      color: Theme.of(context).colorScheme.primary,
                       strokeWidth: 5,
                     )
                   else
                     Polyline(
                       points: _animPoints.take(max(1, _animCount)).toList(),
-                      color: Colors.deepOrange,
+                      color: Theme.of(context).colorScheme.primary,
                       strokeWidth: 5,
                     ),
                 ],
@@ -357,10 +357,12 @@ class _POIMarkersLayer extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.deepOrange, width: 3),
+            border: Border.all(
+                color: Theme.of(context).colorScheme.primary, width: 3),
             boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 6)],
           ),
-          child: const Icon(Icons.place, color: Colors.deepOrange, size: 30),
+          child: Icon(Icons.place,
+              color: Theme.of(context).colorScheme.primary, size: 30),
         ),
       ));
     }
@@ -517,6 +519,7 @@ class _SummaryOverlay extends StatelessWidget {
     final eventsVM = context.watch<EventsProvider>();
     final travel = routeVM.travelTimeInfo;
     final surface = Theme.of(context).colorScheme.surface;
+    final primary = Theme.of(context).colorScheme.primary;
     final trafficSegments = TrafficService.shared
         .trafficAlongRoute(route.waypoints, eventsVM.events);
     final hasBlock = TrafficService.shared.hasBlock(trafficSegments);
@@ -553,7 +556,7 @@ class _SummaryOverlay extends StatelessWidget {
                     icon: const Icon(Icons.navigation, size: 20),
                     label: const Text('Start nawigacji'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
+                      backgroundColor: primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       textStyle: const TextStyle(
@@ -563,8 +566,7 @@ class _SummaryOverlay extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.route,
-                          size: 18, color: Colors.deepOrange),
+                      Icon(Icons.route, size: 18, color: primary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -582,47 +584,14 @@ class _SummaryOverlay extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _summaryItem(Icons.schedule,
+                        _summaryItem(context, Icons.schedule,
                             travel.formattedDrivingTime, 'Czas jazdy'),
-                        _summaryItem(Icons.timer_outlined,
+                        _summaryItem(context, Icons.timer_outlined,
                             travel.formattedTotalTime, 'Z przerwami'),
-                        _summaryItem(Icons.straighten, travel.formattedDistance,
-                            'Dystans'),
-                        _summaryItem(
-                            Icons.alarm, travel.formattedArrival(), 'Przyjazd'),
-                      ],
-                    ),
-                  ],
-                  if (route.roadTypes.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        for (final t in route.roadTypes)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: Colors.deepOrange, width: 1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_roadIcon(t),
-                                    size: 14, color: Colors.deepOrange),
-                                const SizedBox(width: 4),
-                                Text(t.label,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87)),
-                              ],
-                            ),
-                          ),
+                        _summaryItem(context, Icons.straighten,
+                            travel.formattedDistance, 'Dystans'),
+                        _summaryItem(context, Icons.alarm,
+                            travel.formattedArrival(), 'Przyjazd'),
                       ],
                     ),
                   ],
@@ -634,31 +603,86 @@ class _SummaryOverlay extends StatelessWidget {
                           TrafficLegend(hasSlow: hasSlow, hasBlock: hasBlock),
                     ),
                   ],
-                  if (weatherVM.weatherPoints.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _weatherItem(weatherVM.predominantCondition),
-                        _summaryItem(
-                            Icons.thermostat,
-                            '${weatherVM.averageTemperature.round()}°',
-                            'Temperatura'),
-                        _summaryItem(Icons.air,
-                            '${weatherVM.maxWindSpeed.round()} km/h', 'Wiatr'),
-                        _summaryItem(
-                            Icons.water_drop,
-                            '${weatherVM.maxPrecipitationProbability.round()}%',
-                            'Opady'),
-                      ],
+                  if (route.roadTypes.isNotEmpty ||
+                      weatherVM.weatherPoints.isNotEmpty ||
+                      routeVM.routeAlternatives.length > 1)
+                    Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: const EdgeInsets.only(bottom: 8),
+                        shape: const Border(),
+                        collapsedShape: const Border(),
+                        leading:
+                            Icon(Icons.tune, size: 20, color: primary),
+                        title: const Text('Szczegóły trasy',
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.bold)),
+                        children: [
+                          if (route.roadTypes.isNotEmpty)
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                for (final t in route.roadTypes)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: primary.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border:
+                                          Border.all(color: primary, width: 1),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(_roadIcon(t),
+                                            size: 14, color: primary),
+                                        const SizedBox(width: 4),
+                                        Text(t.label,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black87)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          if (weatherVM.weatherPoints.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _weatherItem(
+                                    context, weatherVM.predominantCondition),
+                                _summaryItem(
+                                    context,
+                                    Icons.thermostat,
+                                    '${weatherVM.averageTemperature.round()}°',
+                                    'Temperatura'),
+                                _summaryItem(
+                                    context,
+                                    Icons.air,
+                                    '${weatherVM.maxWindSpeed.round()} km/h',
+                                    'Wiatr'),
+                                _summaryItem(
+                                    context,
+                                    Icons.water_drop,
+                                    '${weatherVM.maxPrecipitationProbability.round()}%',
+                                    'Opady'),
+                              ],
+                            ),
+                          ],
+                          if (routeVM.routeAlternatives.length > 1) ...[
+                            const SizedBox(height: 10),
+                            _buildAlternatives(routeVM),
+                          ],
+                        ],
+                      ),
                     ),
-                  ],
-                  if (routeVM.routeAlternatives.length > 1) ...[
-                    const SizedBox(height: 8),
-                    const Divider(height: 1),
-                    const SizedBox(height: 8),
-                    _buildAlternatives(routeVM),
-                  ],
                   const SizedBox(height: 4),
                   _buildMotorcyclistSection(context),
                   const SizedBox(height: 8),
@@ -667,9 +691,8 @@ class _SummaryOverlay extends StatelessWidget {
                     icon: const Icon(Icons.bookmark, size: 18),
                     label: const Text('Zapisz trasę'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.deepOrange,
-                      side: const BorderSide(
-                          color: Colors.deepOrange, width: 1.5),
+                      foregroundColor: primary,
+                      side: BorderSide(color: primary, width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       textStyle: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w600),
@@ -750,7 +773,8 @@ class _SummaryOverlay extends StatelessWidget {
       tilePadding: EdgeInsets.zero,
       shape: const Border(),
       collapsedShape: const Border(),
-      leading: const Icon(Icons.attractions, color: Colors.deepOrange),
+      leading:
+          Icon(Icons.attractions, color: Theme.of(context).colorScheme.primary),
       title: const Text('Dla motocyklisty',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
       subtitle: Text(
@@ -773,7 +797,7 @@ class _SummaryOverlay extends StatelessWidget {
               icon: const Icon(Icons.search, size: 18),
               label: const Text('Wyszukaj miejsca wzdłuż trasy'),
               style: TextButton.styleFrom(
-                foregroundColor: Colors.deepOrange,
+                foregroundColor: Theme.of(context).colorScheme.primary,
                 textStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
@@ -831,14 +855,15 @@ class _SummaryOverlay extends StatelessWidget {
     }
   }
 
-  Widget _summaryItem(IconData icon, String value, String label) {
+  Widget _summaryItem(
+      BuildContext context, IconData icon, String value, String label) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: Colors.deepOrange),
+            Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 3),
             Text(value,
                 style:
@@ -850,11 +875,12 @@ class _SummaryOverlay extends StatelessWidget {
     );
   }
 
-  Widget _weatherItem(WeatherCondition condition) {
+  Widget _weatherItem(BuildContext context, WeatherCondition condition) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(_conditionIcon(condition), size: 16, color: Colors.deepOrange),
+        Icon(_conditionIcon(condition),
+            size: 16, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 2),
         Text(_conditionLabel(condition),
             style: const TextStyle(fontSize: 11, color: Colors.grey)),
@@ -944,6 +970,7 @@ class _AlternativeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fastest = route.label == 'Najszybsza';
+    final primary = Theme.of(context).colorScheme.primary;
     final travel = PolishTrafficRegulations.shared
         .calculateTravelTime(route.totalDistance, route.roadTypes);
     final displaySeconds = timeOverride ?? travel.drivingTime;
@@ -954,13 +981,11 @@ class _AlternativeTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.deepOrange.withValues(alpha: 0.12)
+              ? primary.withValues(alpha: 0.12)
               : Colors.grey.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected
-                ? Colors.deepOrange
-                : Colors.grey.withValues(alpha: 0.4),
+            color: selected ? primary : Colors.grey.withValues(alpha: 0.4),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -981,7 +1006,7 @@ class _AlternativeTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: selected ? Colors.deepOrange : null,
+                      color: selected ? primary : null,
                     ),
                   ),
                   Text(
@@ -992,7 +1017,7 @@ class _AlternativeTile extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(Icons.check_circle, color: Colors.deepOrange, size: 18)
+              Icon(Icons.check_circle, color: primary, size: 18)
             else
               const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
           ],
