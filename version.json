@@ -1,6 +1,6 @@
 {
-  "version": "1.1.0",
-  "build_number": 8,
-  "changelog": "Konta uzytkownikow (rejestracja e-mail, szybkie logowanie pseudonimem, tryb goscia), wspolne potwierzanie zdarzen drogowych przez wielu kierowcow oraz punkty i poziomy za zgloszenia, potwierdzenia i dodane miejsca. Warstwa konta gotowa do podlaczenia Firebase.",
+  "version": "1.1.2",
+  "build_number": 10,
+  "changelog": "Fotoradary i miejsca dla motocyklisty dzialaja teraz z wbudowanej bazy offline (bez internetu i bez Overpass): ~37 tys. kamer Europy (stacjonarne, czerwone swiatlo, odcinkowy pomiar) oraz ~56 tys. punktow widokowych, przeleczy i serwisow motocyklowych. Dziala natychmiast i niezaleznie od obciazenia serwerow OSM.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }

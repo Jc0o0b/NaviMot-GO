@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../models/road_event.dart';
 import '../utils/route_proximity.dart';
+import 'offline_data.dart';
 
 /// Pobiera fotoradary i kamery drogowe z OSM (Overpass API) wzdłuż trasy:
 /// - fotoradary stacjonarne (`highway=speed_camera`),
@@ -18,10 +19,13 @@ class CameraService {
   static const List<String> _endpoints = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
   ];
   static const double _maxDistanceToRoute = 500;
   static const double _bboxBuffer = 0.04;
   static const Duration _cacheTtl = Duration(minutes: 30);
+  static const Duration _emptyCacheTtl = Duration(minutes: 3);
+  static const Duration _requestTimeout = Duration(seconds: 45);
   static const Duration _minInterval = Duration(seconds: 2);
 
   final http.Client _client = http.Client();
@@ -31,27 +35,56 @@ class CameraService {
 
   Future<List<RoadEvent>> camerasForRoute(List<LatLng> waypoints) async {
     if (waypoints.length < 2) return const [];
-    double minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-    for (final p in waypoints) {
-      if (p.latitude < minLat) minLat = p.latitude;
-      if (p.latitude > maxLat) maxLat = p.latitude;
-      if (p.longitude < minLon) minLon = p.longitude;
-      if (p.longitude > maxLon) maxLon = p.longitude;
-    }
-    final key = _bboxKey(minLat, minLon, maxLat, maxLon);
-    var bboxCameras = _cachedBbox(key);
-    if (bboxCameras == null) {
-      bboxCameras = await _fetchBbox(minLat, minLon, maxLat, maxLon);
-      _bboxCache[key] = bboxCameras;
-      _cacheTime[key] = DateTime.now();
-    }
+
+    // Źródło podstawowe: wbudowana baza offline — zawsze działa, bez internetu.
     final result = <String, RoadEvent>{};
-    for (final e in bboxCameras) {
-      if (distanceToRoute(LatLng(e.lat, e.lon), waypoints) <=
+    final offline = await OfflineData.shared.cameras();
+    for (var i = 0; i < offline.length; i++) {
+      final c = offline[i];
+      if (distanceToRoute(LatLng(c.lat, c.lon), waypoints) <=
           _maxDistanceToRoute) {
-        result[e.id] = e;
+        result['cam-off-$i'] = RoadEvent(
+          id: 'cam-off-$i',
+          type: c.type,
+          lat: c.lat,
+          lon: c.lon,
+          description: _description(c.type, c.limit),
+          createdAt: DateTime(2000),
+          speedLimit: c.limit,
+        );
       }
     }
+
+    // Uzupełnienie z Overpass (kamery spoza bazy / świeższe tagi).
+    // Best-effort: nie blokuje i nie psuje wyniku offline.
+    try {
+      double minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+      for (final p in waypoints) {
+        if (p.latitude < minLat) minLat = p.latitude;
+        if (p.latitude > maxLat) maxLat = p.latitude;
+        if (p.longitude < minLon) minLon = p.longitude;
+        if (p.longitude > maxLon) maxLon = p.longitude;
+      }
+      final key = _bboxKey(minLat, minLon, maxLat, maxLon);
+      var bboxCameras = _cachedBbox(key);
+      if (bboxCameras == null) {
+        final fetched = await _fetchBbox(minLat, minLon, maxLat, maxLon);
+        if (fetched != null) {
+          _bboxCache[key] = fetched;
+          _cacheTime[key] = DateTime.now();
+        }
+        bboxCameras = fetched ?? const <RoadEvent>[];
+      }
+      for (final e in bboxCameras) {
+        if (distanceToRoute(LatLng(e.lat, e.lon), waypoints) <=
+            _maxDistanceToRoute) {
+          result.putIfAbsent(e.id, () => e);
+        }
+      }
+    } catch (_) {
+      // Overpass niedostępny — pomijamy, dane offline już są.
+    }
+
     return result.values.toList();
   }
 
@@ -64,31 +97,54 @@ class CameraService {
   List<RoadEvent>? _cachedBbox(String key) {
     final t = _cacheTime[key];
     if (t == null) return null;
-    if (DateTime.now().difference(t) > _cacheTtl) {
+    final list = _bboxCache[key];
+    // Pusty wynik (możliwy np. przy chwilowym braku odpowiedzi serwera)
+    // cache'ujemy krótko, pełny wynik znacznie dłużej.
+    final ttl = (list == null || list.isEmpty) ? _emptyCacheTtl : _cacheTtl;
+    if (DateTime.now().difference(t) > ttl) {
       _bboxCache.remove(key);
       _cacheTime.remove(key);
       return null;
     }
-    return _bboxCache[key];
+    return list;
   }
 
-  Future<List<RoadEvent>> _fetchBbox(double minLat, double minLon,
+  /// Zwraca `null`, gdy żadne źródło nie odpowiedziało poprawnie
+  /// (błąd sieci / HTTP 5xx). Pusty wynik nie jest błędem.
+  Future<List<RoadEvent>?> _fetchBbox(double minLat, double minLon,
       double maxLat, double maxLon) async {
     final south = (minLat - _bboxBuffer).clamp(-90.0, 90.0);
     final west = (minLon - _bboxBuffer).clamp(-180.0, 180.0);
     final north = (maxLat + _bboxBuffer).clamp(-90.0, 90.0);
     final east = (maxLon + _bboxBuffer).clamp(-180.0, 180.0);
     final bbox = '($south,$west,$north,$east)';
-    final query =
-        '[out:json][timeout:25];'
-        '('
-        'node["highway"="speed_camera"]$bbox;'
-        'node["enforcement"="red_light"]$bbox;'
-        'node["enforcement"="average_speed"]$bbox;'
-        'node["highway"="speed_camera"]["enforcement"="average_speed"]$bbox;'
-        'relation["enforcement"="average_speed"]$bbox;'
-        ');'
-        'out center tags;';
+
+    // Węzły: `out body;` (zawiera współrzędne) — szybkie i niezawodne.
+    final nodes = await _runOverpass(
+      '[out:json][timeout:30];'
+      '('
+      'node["highway"="speed_camera"]$bbox;'
+      'node["enforcement"="red_light"]$bbox;'
+      'node["enforcement"="average_speed"]$bbox;'
+      ');'
+      'out body;',
+    );
+    if (nodes == null) return null;
+    final cameras = <RoadEvent>[...nodes];
+
+    // Odcinkowy pomiar prędkości bywa mapowany jako relacja — wymaga `center`,
+    // ale traktujemy to jako best-effort (błąd nie psuje wyniku).
+    final relations = await _runOverpass(
+      '[out:json][timeout:30];'
+      'relation["enforcement"="average_speed"]$bbox;'
+      'out center;',
+    );
+    if (relations != null) cameras.addAll(relations);
+
+    return cameras;
+  }
+
+  Future<List<RoadEvent>?> _runOverpass(String query) async {
     for (final endpoint in _endpoints) {
       try {
         final wait = _minInterval.inMilliseconds -
@@ -105,7 +161,7 @@ class CameraService {
                     'NaviMot-GO/1.0 (motorcycle route planner; OSM speed cameras)',
               },
             )
-            .timeout(const Duration(seconds: 30));
+            .timeout(_requestTimeout);
         _lastFetch = DateTime.now();
         if (resp.statusCode != 200) continue;
         final json =
@@ -136,7 +192,7 @@ class CameraService {
         continue;
       }
     }
-    return const [];
+    return null;
   }
 
   RoadEventType _cameraType(Map<String, dynamic> tags) {

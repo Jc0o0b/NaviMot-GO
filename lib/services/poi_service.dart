@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../models/point_of_interest.dart';
 import '../utils/route_scaling.dart';
+import 'offline_data.dart';
 
 class POIService {
   static final POIService _instance = POIService._();
@@ -30,11 +31,38 @@ class POIService {
     double radius = 10000,
   }) async {
     if (waypoints.isEmpty) return [];
-    final samples = _samplePoints(waypoints, 3);
-    final query = _buildQuery(samples, radius: radius);
-    final pois = await _fetchOverpass(query);
-    return _selectBest(pois, waypoints,
-        radius: radius, maxCount: markerCountForRoute(waypoints));
+
+    // Źródło podstawowe: wbudowana baza offline (punkty widokowe, przełęczy,
+    // serwisy motocyklowe) — zawsze działa, bez internetu.
+    final offline = await OfflineData.shared.pois();
+    final result = <String, PointOfInterest>{};
+    for (final poi in offline) {
+      final proj = _projectOntoRoute(poi.coordinate, waypoints);
+      if (proj.$2 <= radius) {
+        result[poi.id] = poi;
+      }
+    }
+
+    // Uzupełnienie z Overpass (restauracje, stacje, noclegi, malownicze drogi).
+    // Best-effort: nie blokuje i nie psuje wyniku offline.
+    try {
+      final samples = _samplePoints(waypoints, 3);
+      final query = _buildQuery(samples, radius: radius);
+      final live = await _fetchOverpass(query);
+      final maxCount = markerCountForRoute(waypoints);
+      final best = _selectBest(live, waypoints, radius: radius, maxCount: maxCount);
+      for (final p in best) {
+        result.putIfAbsent(p.id, () => p);
+      }
+    } catch (_) {
+      // Overpass niedostępny — pomijamy, dane offline już są.
+    }
+
+    // Zwracamy najwyżej markerCountForRoute miejsc (offline + ewentualne z sieci).
+    final all = result.values.toList();
+    final maxCount = markerCountForRoute(waypoints);
+    if (all.length <= maxCount) return all;
+    return _selectBest(all, waypoints, radius: radius, maxCount: maxCount);
   }
 
   Future<List<PointOfInterest>> fetchPOIsNearLocation(
