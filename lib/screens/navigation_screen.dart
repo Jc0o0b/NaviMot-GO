@@ -224,10 +224,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     final snapped = _snapToRoute(location);
     final realToRoute = _distanceBetween(location, snapped);
     setState(() {
-      _currentLocation = location;
+      _currentLocation = snapped;
       _simAlong = _distanceAlong(snapped);
     });
-    _moveCameraTo(location);
+    _moveCameraTo(snapped);
     if (realToRoute > _rerouteThresholdMeters) {
       _maybeReroute(location, realToRoute);
     }
@@ -314,11 +314,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
       _demoMode = false;
     }
     setState(() {
-      _currentLocation = real;
+      _currentLocation = snapped;
       _currentSpeed = speedMs > 0.4 ? speedMs * 3.6 : 0;
       _updateProgress(snapped);
     });
-    _moveCameraTo(real);
+    _moveCameraTo(snapped);
     if (realToRoute > _rerouteThresholdMeters) {
       _maybeReroute(real, realToRoute);
     }
