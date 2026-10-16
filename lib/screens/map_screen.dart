@@ -139,9 +139,12 @@ class _MapScreenState extends State<MapScreen>
               ),
               MarkerLayer(
                 markers: [
-                  if (route.waypoints.isNotEmpty)
+                  if (route.waypoints.isNotEmpty && _currentLocation == null)
                     _buildMarker(
-                        route.waypoints.first, Icons.motorcycle, Colors.green),
+                        route.waypoints.first, Icons.motorcycle, Colors.green)
+                  else if (route.waypoints.isNotEmpty)
+                    _buildMarker(
+                        route.waypoints.first, Icons.location_pin, Colors.green),
                   if (route.waypoints.length > 1)
                     _buildMarker(route.waypoints.last, Icons.flag, Colors.red),
                 ],

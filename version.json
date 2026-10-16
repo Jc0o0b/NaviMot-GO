@@ -1,6 +1,6 @@
 {
-  "version": "2.1.2",
-  "build_number": 15,
-  "changelog": "Audyt bezpieczeñstwa i stabilnoœci.",
+  "version": "1.0.0",
+  "build_number": 1,
+  "changelog": "Reset numeracji wersji. Poprawka markerów w nawigacji: unikaj duplikowania znacznika startu przy aktualnej lokalizacji.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
