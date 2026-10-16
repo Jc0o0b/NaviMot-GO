@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/important_place.dart';
 import '../models/road_event.dart';
 import '../providers/events_provider.dart';
+import '../screens/account_screen.dart';
 import '../services/location_service.dart';
 
 Uint8List? _tryDecodeBase64(String? data) {
@@ -111,6 +112,58 @@ Future<LatLng?> resolveReportLocation(
   return fallback;
 }
 
+/// Pyta o obowiązujący limit prędkości dla fotoradaru/kamery.
+/// Zwraca: limit (>0), 0 = brak limitu, null = anulowano.
+Future<int?> _askSpeedLimit(BuildContext context, RoadEventType type) async {
+  const limits = [30, 40, 50, 60, 70, 80, 90, 100, 120];
+  return showModalBottomSheet<int>(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(eventIcon(type), color: roadEventColor(type), size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('${type.label} — limit prędkości',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Wybierz obowiązujący limit (opcjonalnie).',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final l in limits)
+                  ChoiceChip(
+                    selected: false,
+                    label: Text('$l'),
+                    onSelected: (_) => Navigator.of(ctx).pop(l),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.remove, size: 16),
+                  label: const Text('Brak'),
+                  onPressed: () => Navigator.of(ctx).pop(0),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Future<void> showEventReportSheet(
   BuildContext context, {
   required LatLng fallbackLocation,
@@ -136,9 +189,21 @@ Future<void> showEventReportSheet(
               for (final type in RoadEventType.values)
                 _ReportRow(
                   icon: eventIcon(type),
-                  color: Colors.red,
+                  color: roadEventColor(type),
                   label: type.label,
                   onTap: () async {
+                    if (!await ensureSignedIn(context,
+                        action: 'zgłaszać zdarzenia')) {
+                      return;
+                    }
+                    if (!ctx.mounted) return;
+                    int? speedLimit;
+                    if (type.isCamera) {
+                      final choice = await _askSpeedLimit(ctx, type);
+                      if (choice == null) return;
+                      speedLimit = choice == 0 ? null : choice;
+                    }
+                    if (!ctx.mounted) return;
                     final location =
                         await resolveReportLocation(fallbackLocation, ctx);
                     if (!ctx.mounted) return;
@@ -150,7 +215,10 @@ Future<void> showEventReportSheet(
                       return;
                     }
                     eventsVM.addRoadEvent(
-                        type: type, location: location, description: null);
+                        type: type,
+                        location: location,
+                        description: null,
+                        speedLimit: speedLimit);
                     Navigator.of(ctx).pop();
                     messenger.showSnackBar(SnackBar(
                       content: Text('Zgłoszono: ${type.label}'),
@@ -438,7 +506,48 @@ Future<void> showEventDetail(BuildContext context, RoadEvent event) async {
                 Text(event.description!,
                     style: const TextStyle(fontSize: 14)),
               ],
+              if (event.confirmations > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.verified,
+                        color: Colors.green, size: 18),
+                    const SizedBox(width: 6),
+                    Text('Potwierdzone przez ${event.confirmations} kierowców',
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.green)),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(ctx);
+                  if (!await ensureSignedIn(ctx,
+                      action: 'potwierdzać zdarzenia')) {
+                    return;
+                  }
+                  final result = await eventsVM.confirmRoadEvent(event.id);
+                  if (!ctx.mounted) return;
+                  final message = switch (result) {
+                    ConfirmResult.ok => 'Dziękujemy! Zdarzenie potwierdzone.',
+                    ConfirmResult.already => 'Już potwierdziłeś to zdarzenie.',
+                    ConfirmResult.notSignedIn =>
+                      'Zaloguj się, aby potwierdzić.',
+                    ConfirmResult.notFound =>
+                      'Nie można potwierdzić tego zdarzenia.',
+                  };
+                  messenger.showSnackBar(SnackBar(
+                      content: Text(message),
+                      duration: const Duration(seconds: 2)));
+                  if (result == ConfirmResult.ok) Navigator.of(ctx).pop();
+                },
+                icon: const Icon(Icons.verified),
+                label: const Text('Potwierdź zdarzenie'),
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12)),
+              ),
+              const SizedBox(height: 8),
               FilledButton.tonalIcon(
                 onPressed: () {
                   eventsVM.removeRoadEvent(event.id);

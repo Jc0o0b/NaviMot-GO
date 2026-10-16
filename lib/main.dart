@@ -8,6 +8,7 @@ import 'providers/route_provider.dart';
 import 'providers/weather_provider.dart';
 import 'providers/poi_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/account_provider.dart';
 import 'providers/events_provider.dart';
 import 'providers/chat_provider.dart';
 import 'screens/splash_screen.dart';
@@ -15,14 +16,17 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final settings = SettingsProvider();
+  final account = AccountProvider();
+  final events = EventsProvider(account: account);
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-        ChangeNotifierProvider(create: (_) => RouteProvider()),
-        ChangeNotifierProvider(create: (_) => WeatherProvider()),
-        ChangeNotifierProvider(create: (_) => POIProvider()),
-        ChangeNotifierProvider(create: (_) => EventsProvider()),
+        ChangeNotifierProvider<AccountProvider>.value(value: account),
+        ChangeNotifierProvider<RouteProvider>(create: (_) => RouteProvider()),
+        ChangeNotifierProvider<WeatherProvider>(create: (_) => WeatherProvider()),
+        ChangeNotifierProvider<POIProvider>(create: (_) => POIProvider()),
+        ChangeNotifierProvider<EventsProvider>.value(value: events),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: const NavimotGoApp(),
@@ -30,6 +34,7 @@ Future<void> main() async {
   );
   WidgetsBinding.instance.addPostFrameCallback((_) => _removeWebSplash());
   unawaited(settings.load());
+  unawaited(account.load());
 }
 
 void _removeWebSplash() {

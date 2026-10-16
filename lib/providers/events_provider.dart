@@ -4,26 +4,35 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/important_place.dart';
 import '../models/road_event.dart';
+import '../models/user_profile.dart';
+import 'account_provider.dart';
+import '../services/community_service.dart';
+
+/// Wynik próby potwierdzenia zdarzenia.
+enum ConfirmResult { ok, already, notSignedIn, notFound }
 
 class EventsProvider extends ChangeNotifier {
-  static const String _eventsKey = 'road_events';
   static const String _placesKey = 'important_places';
+
+  final CommunityService _community;
+  final AccountProvider? _account;
+
+  EventsProvider({CommunityService? community, AccountProvider? account})
+      : _community = community ?? LocalCommunityService(),
+        _account = account;
 
   List<RoadEvent> _events = [];
   List<ImportantPlace> _places = [];
   bool _loaded = false;
   Future<void>? _loadFuture;
 
-  // Zwracamy listy bezpośrednio (bez List.unmodifiable) — wcześniej każdy
-  // dostęp alokował nową listę, co powodowało GC w pętli build i sprawiało,
-  // że porównania tożsamości w cache'ach widgetów nigdy nie trafiały.
+  // Zwracamy listy bezpośrednio (bez List.unmodifiable) — porównania
+  // tożsamości w cache'ach widgetów muszą trafiać.
   List<RoadEvent> get events => _events;
   List<ImportantPlace> get importantPlaces => _places;
   bool get isLoaded => _loaded;
 
-  EventsProvider() {
-    load();
-  }
+  bool get _isSignedIn => _account?.isSignedIn ?? false;
 
   Future<void> load() {
     return _loadFuture ??= _doLoad();
@@ -31,32 +40,18 @@ class EventsProvider extends ChangeNotifier {
 
   Future<void> _doLoad() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      _events = _readEvents(prefs);
-      _places = _readPlaces(prefs);
+      _events = await _community.fetchEvents();
     } catch (_) {
       _events = [];
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _places = _readPlaces(prefs);
+    } catch (_) {
       _places = [];
     }
     _loaded = true;
     notifyListeners();
-  }
-
-  List<RoadEvent> _readEvents(SharedPreferences prefs) {
-    final raw = prefs.getString(_eventsKey);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final list = jsonDecode(raw) as List;
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        try {
-          return RoadEvent.fromJson(e);
-        } catch (_) {
-          return null;
-        }
-      }).whereType<RoadEvent>().toList();
-    } catch (_) {
-      return [];
-    }
   }
 
   List<ImportantPlace> _readPlaces(SharedPreferences prefs) {
@@ -64,42 +59,70 @@ class EventsProvider extends ChangeNotifier {
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List;
-      return list.whereType<Map<String, dynamic>>().map((e) {
-        try {
-          return ImportantPlace.fromJson(e);
-        } catch (_) {
-          return null;
-        }
-      }).whereType<ImportantPlace>().toList();
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map((e) {
+            try {
+              return ImportantPlace.fromJson(e);
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<ImportantPlace>()
+          .toList();
     } catch (_) {
       return [];
     }
   }
 
-  Future<void> addRoadEvent({
+  Future<RoadEvent> addRoadEvent({
     required RoadEventType type,
     required LatLng location,
     String? description,
+    int? speedLimit,
   }) async {
-    _events.insert(
-      0,
-      RoadEvent(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        type: type,
-        lat: location.latitude,
-        lon: location.longitude,
-        description: description,
-        createdAt: DateTime.now(),
-      ),
+    final reporterId = _account?.user?.uid;
+    final event = RoadEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      type: type,
+      lat: location.latitude,
+      lon: location.longitude,
+      description: description,
+      createdAt: DateTime.now(),
+      speedLimit: speedLimit,
+      reporterId: reporterId,
     );
+    _events.insert(0, event);
     notifyListeners();
-    await _persistEvents();
+    await _community.saveEvents(_events);
+    if (_isSignedIn) {
+      await _account?.award(points: PointsRules.report, report: true);
+    }
+    return event;
+  }
+
+  /// Potwierdza zdarzenie (jeden użytkownik może potwierdzić raz).
+  Future<ConfirmResult> confirmRoadEvent(String eventId) async {
+    final uid = _account?.user?.uid;
+    if (uid == null) return ConfirmResult.notSignedIn;
+    final idx = _events.indexWhere((e) => e.id == eventId);
+    if (idx == -1) return ConfirmResult.notFound;
+    final confirmed = await _community.confirmationsFor(eventId);
+    if (confirmed.contains(uid)) return ConfirmResult.already;
+    await _community.saveConfirmation(eventId, uid);
+    _events[idx] =
+        _events[idx].copyWith(confirmations: _events[idx].confirmations + 1);
+    notifyListeners();
+    await _community.saveEvents(_events);
+    await _account?.award(
+        points: PointsRules.confirmation, confirmation: true);
+    return ConfirmResult.ok;
   }
 
   Future<void> removeRoadEvent(String id) async {
     _events.removeWhere((e) => e.id == id);
     notifyListeners();
-    await _persistEvents();
+    await _community.saveEvents(_events);
   }
 
   Future<void> addImportantPlace({
@@ -122,22 +145,15 @@ class EventsProvider extends ChangeNotifier {
     );
     notifyListeners();
     await _persistPlaces();
+    if (_isSignedIn) {
+      await _account?.award(points: PointsRules.placeAdded, place: true);
+    }
   }
 
   Future<void> removeImportantPlace(String id) async {
     _places.removeWhere((p) => p.id == id);
     notifyListeners();
     await _persistPlaces();
-  }
-
-  Future<void> _persistEvents() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _eventsKey,
-        jsonEncode(_events.map((e) => e.toJson()).toList()),
-      );
-    } catch (_) {}
   }
 
   Future<void> _persistPlaces() async {

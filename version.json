@@ -1,6 +1,6 @@
 {
-  "version": "1.0.6",
-  "build_number": 7,
-  "changelog": "Podglad trasy: zgrupowane POI (hotele, restauracje, stacje paliw, punkty widokowe) z ikonami i informacjami oraz typy kamer (stacjonarne, mobilne, na czerwonym swietle, odcinkowy pomiar) z obowiazujacym limitem predkosci.",
+  "version": "1.1.0",
+  "build_number": 8,
+  "changelog": "Konta uzytkownikow (rejestracja e-mail, szybkie logowanie pseudonimem, tryb goscia), wspolne potwierzanie zdarzen drogowych przez wielu kierowcow oraz punkty i poziomy za zgloszenia, potwierdzenia i dodane miejsca. Warstwa konta gotowa do podlaczenia Firebase.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
