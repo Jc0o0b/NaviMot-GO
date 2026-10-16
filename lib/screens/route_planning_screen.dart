@@ -4,10 +4,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/country.dart';
 import '../models/important_place.dart';
+import '../models/point_of_interest.dart';
 import '../models/road_event.dart';
 import '../models/route.dart';
 import '../models/traffic_regulations.dart';
 import '../providers/events_provider.dart';
+import '../providers/poi_provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/weather_provider.dart';
@@ -19,6 +21,7 @@ import '../widgets/event_widgets.dart';
 
 import '../widgets/home_sheet.dart';
 import '../widgets/offline_route_preview.dart';
+import '../widgets/poi_marker.dart';
 import '../widgets/section_header.dart';
 import '../widgets/traffic_overlay.dart';
 import 'navigation_screen.dart';
@@ -53,6 +56,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   List<ImportantPlace>? _confirmPlacesSrc;
   List<RoadEvent>? _confirmEventsSrc;
   List<RoadEvent>? _confirmCamerasSrc;
+  List<PointOfInterest>? _confirmPoisSrc;
   _ConfirmInfo? _confirmInfo;
 
   @override
@@ -68,14 +72,19 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<RouteProvider, WeatherProvider, EventsProvider>(
-      builder: (context, routeVM, weatherVM, eventsVM, _) {
+    return Consumer4<RouteProvider, WeatherProvider, EventsProvider, POIProvider>(
+      builder: (context, routeVM, weatherVM, eventsVM, poiVM, _) {
         final route = routeVM.currentRoute;
         if (route != null && route.id != _loadedRouteId) {
           _loadedRouteId = route.id;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             weatherVM.loadWeather(route);
+            // Pobierz POI wzdłuż trasy (jednorazowo — nawigacja z MapScreen
+            // też je ładuje, ale dla tego samego identyfikatora pomijamy).
+            if (poiVM.loadedRouteId != route.id) {
+              poiVM.loadPOIs(route, radius: 10000);
+            }
             if (_navigateOnReady) {
               _navigateOnReady = false;
               widget.onRoutePlanned?.call();
@@ -209,7 +218,7 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                       ],
                       if (routeVM.currentRoute != null) ...[
                         const SizedBox(height: 24),
-                        _buildConfirmation(routeVM, eventsVM),
+                        _buildConfirmation(routeVM, eventsVM, poiVM),
                       ],
                     ],
                   ),
@@ -445,16 +454,19 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
   /// Wylicza (i cache'uje) miejsca, zdarzenia i korki wokół trasy.
   /// Bez cache te obliczenia (skan wszystkich zdarzeń/miejsc) wykonywały się
   /// przy każdym przebudowaniu ekranu, np. przy każdym znaku wpisywanym w polu.
-  _ConfirmInfo _confirmInfoFor(RouteProvider routeVM, EventsProvider eventsVM) {
+  _ConfirmInfo _confirmInfoFor(RouteProvider routeVM, EventsProvider eventsVM,
+      POIProvider poiVM) {
     final route = routeVM.currentRoute!;
     final places = eventsVM.importantPlaces;
     final events = eventsVM.events;
     final cameras = routeVM.routeCameras;
+    final pois = poiVM.pointsOfInterest;
     if (_confirmInfo != null &&
         _confirmRouteId == route.id &&
         identical(_confirmPlacesSrc, places) &&
         identical(_confirmEventsSrc, events) &&
-        identical(_confirmCamerasSrc, cameras)) {
+        identical(_confirmCamerasSrc, cameras) &&
+        identical(_confirmPoisSrc, pois)) {
       return _confirmInfo!;
     }
     final nearPlaces = itemsWithinRoute(
@@ -469,6 +481,12 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       5000,
       (e) => LatLng(e.lat, e.lon),
     );
+    final nearPois = itemsWithinRoute(
+      pois,
+      route.waypoints,
+      5000,
+      (p) => p.coordinate,
+    );
     final traffic =
         TrafficService.shared.trafficAlongRoute(route.waypoints, nearEvents);
     final info = _ConfirmInfo(
@@ -476,20 +494,24 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
       nearEvents,
       TrafficService.shared.hasBlock(traffic),
       TrafficService.shared.hasSlow(traffic),
+      nearPois,
     );
     _confirmRouteId = route.id;
     _confirmPlacesSrc = places;
     _confirmEventsSrc = events;
     _confirmCamerasSrc = cameras;
+    _confirmPoisSrc = pois;
     _confirmInfo = info;
     return info;
   }
 
-  Widget _buildConfirmation(RouteProvider routeVM, EventsProvider eventsVM) {
+  Widget _buildConfirmation(RouteProvider routeVM, EventsProvider eventsVM,
+      POIProvider poiVM) {
     final route = routeVM.currentRoute!;
-    final info = _confirmInfoFor(routeVM, eventsVM);
+    final info = _confirmInfoFor(routeVM, eventsVM, poiVM);
     final nearPlaces = info.nearPlaces;
     final nearEvents = info.nearEvents;
+    final nearPois = info.nearPois;
     final hasBlock = info.hasBlock;
     final hasSlow = info.hasSlow;
     return Card(
@@ -564,9 +586,11 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                 route: route,
                 events: nearEvents,
                 places: nearPlaces,
+                pois: nearPois,
                 label: null,
               ),
             ),
+            _PreviewLegend(pois: nearPois, events: nearEvents),
             if (hasBlock || hasSlow) ...[
               const SizedBox(height: 8),
               TrafficLegend(hasSlow: hasSlow, hasBlock: hasBlock),
@@ -649,9 +673,21 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(e.type.label,
-                                style: const TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(e.type.label,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                                if (e.speedLimit != null) ...[
+                                  const SizedBox(width: 6),
+                                  _SpeedLimitChip(limit: e.speedLimit!),
+                                ],
+                              ],
+                            ),
                             if (e.description != null &&
                                 e.description!.isNotEmpty)
                               Text(e.description!,
@@ -659,12 +695,38 @@ class _RoutePlanningScreenState extends State<RoutePlanningScreen> {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                       fontSize: 11, color: Colors.grey)),
+                            if (e.confirmations > 0)
+                              Text('Potwierdzone przez ${e.confirmations} kierowców',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.green)),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
+            ],
+            if (nearPois.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Icon(Icons.place, color: Color(0xFF0288D1), size: 20),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text('Miejsca na trasie',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Hotele, restauracje, stacje paliw i punkty widokowe przy trasie',
+                style: TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+              _POIGroups(pois: nearPois),
             ],
             if (nearPlaces.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -960,13 +1022,187 @@ class _ConfirmInfo {
   final List<RoadEvent> nearEvents;
   final bool hasBlock;
   final bool hasSlow;
+  final List<PointOfInterest> nearPois;
 
   const _ConfirmInfo(
     this.nearPlaces,
     this.nearEvents,
     this.hasBlock,
     this.hasSlow,
+    this.nearPois,
   );
+}
+
+/// Legenda pod podglądem trasy: zgrupowane ikony POI oraz zdarzeń
+/// (w tym typy fotoradarów/kamer) z licznikami.
+class _PreviewLegend extends StatelessWidget {
+  final List<PointOfInterest> pois;
+  final List<RoadEvent> events;
+  const _PreviewLegend({required this.pois, required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    final poiGroups = <POICategory, int>{};
+    for (final p in pois) {
+      poiGroups[p.category] = (poiGroups[p.category] ?? 0) + 1;
+    }
+    final eventGroups = <RoadEventType, int>{};
+    for (final e in events) {
+      eventGroups[e.type] = (eventGroups[e.type] ?? 0) + 1;
+    }
+    if (poiGroups.isEmpty && eventGroups.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          for (final entry in eventGroups.entries)
+            _LegendChip(
+              icon: eventIcon(entry.key),
+              color: roadEventColor(entry.key),
+              label: '${entry.key.label} (${entry.value})',
+            ),
+          for (final entry in poiGroups.entries)
+            _LegendChip(
+              icon: poiIcon(entry.key),
+              color: poiColor(entry.key),
+              label: '${entry.key.label} (${entry.value})',
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  const _LegendChip(
+      {required this.icon, required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Zgrupowane POI wzdłuż trasy: ikona + liczba + pozycje z informacją.
+class _POIGroups extends StatelessWidget {
+  final List<PointOfInterest> pois;
+  const _POIGroups({required this.pois});
+
+  static const List<POICategory> _order = [
+    POICategory.accommodation,
+    POICategory.restaurant,
+    POICategory.fuel,
+    POICategory.viewpoint,
+    POICategory.mountainPass,
+    POICategory.scenicRoad,
+    POICategory.service,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <POICategory, List<PointOfInterest>>{};
+    for (final p in pois) {
+      groups.putIfAbsent(p.category, () => []).add(p);
+    }
+    final keys = [
+      ..._order.where(groups.containsKey),
+      ...groups.keys.where((k) => !_order.contains(k)),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final cat in keys) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(poiIcon(cat), size: 16, color: poiColor(cat)),
+              const SizedBox(width: 6),
+              Text('${cat.label} (${groups[cat]!.length})',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          for (final p in groups[cat]!.take(4))
+            Padding(
+              padding: const EdgeInsets.only(left: 22, top: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                  if (p.description.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        p.description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          if (groups[cat]!.length > 4)
+            Padding(
+              padding: const EdgeInsets.only(left: 22, top: 3),
+              child: Text('i ${groups[cat]!.length - 4} więcej',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Chip z obowiązującym limitem prędkości dla fotoradaru/kamery.
+class _SpeedLimitChip extends StatelessWidget {
+  final int limit;
+  const _SpeedLimitChip({required this.limit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text('$limit km/h',
+          style: const TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+    );
+  }
 }
 
 class _StopTile extends StatelessWidget {

@@ -816,7 +816,7 @@ class _SummaryOverlay extends StatelessWidget {
                   leading: CircleAvatar(
                     radius: 16,
                     backgroundColor: Colors.orange.withValues(alpha: 0.2),
-                    child: Icon(_poiIcon(poi.category),
+                    child: Icon(poiIcon(poi.category),
                         color: Colors.orange, size: 16),
                   ),
                   title: Text(poi.name,
@@ -834,25 +834,6 @@ class _SummaryOverlay extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  IconData _poiIcon(POICategory category) {
-    switch (category) {
-      case POICategory.viewpoint:
-        return Icons.visibility;
-      case POICategory.mountainPass:
-        return Icons.terrain;
-      case POICategory.scenicRoad:
-        return Icons.route;
-      case POICategory.fuel:
-        return Icons.local_gas_station;
-      case POICategory.service:
-        return Icons.build;
-      case POICategory.accommodation:
-        return Icons.hotel;
-      case POICategory.restaurant:
-        return Icons.restaurant;
-    }
   }
 
   Widget _summaryItem(

@@ -23,8 +23,14 @@ IconData eventIcon(RoadEventType type) {
   switch (type) {
     case RoadEventType.police:
       return Icons.local_police;
-    case RoadEventType.speedCamera:
+    case RoadEventType.speedCameraStationary:
       return Icons.photo_camera;
+    case RoadEventType.speedCameraMobile:
+      return Icons.directions_car_filled;
+    case RoadEventType.redLightCamera:
+      return Icons.traffic;
+    case RoadEventType.averageSpeedCamera:
+      return Icons.speed;
     case RoadEventType.accident:
       return Icons.car_crash;
     case RoadEventType.obstacle:
@@ -38,7 +44,10 @@ Color roadEventColor(RoadEventType type) {
   switch (type) {
     case RoadEventType.police:
       return Colors.blue;
-    case RoadEventType.speedCamera:
+    case RoadEventType.speedCameraStationary:
+    case RoadEventType.speedCameraMobile:
+    case RoadEventType.redLightCamera:
+    case RoadEventType.averageSpeedCamera:
       return Colors.red;
     case RoadEventType.accident:
       return Colors.deepOrange;

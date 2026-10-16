@@ -21,7 +21,7 @@ void main() {
     final provider = EventsProvider();
     await provider.load();
     await provider.addRoadEvent(
-      type: RoadEventType.speedCamera,
+      type: RoadEventType.speedCameraStationary,
       location: const LatLng(52.1, 21.0),
     );
     await provider.addImportantPlace(
@@ -30,7 +30,8 @@ void main() {
       location: const LatLng(52.2, 21.1),
     );
     expect(provider.events.length, 1);
-    expect(provider.events.first.type, RoadEventType.speedCamera);
+    expect(
+        provider.events.first.type, RoadEventType.speedCameraStationary);
     expect(provider.importantPlaces.length, 1);
 
     final reloaded = EventsProvider();
@@ -297,5 +298,56 @@ void main() {
         places, waypoints, 3000, (p) => LatLng(p.lat, p.lon));
     expect(near.length, 1);
     expect(near.first.name, 'Panorama');
+  });
+
+  test('RoadEventType: zgodność wstecz i rozpoznawanie kamer', () {
+    expect(RoadEventType.fromName('speedCamera'),
+        RoadEventType.speedCameraStationary);
+    expect(RoadEventType.fromName('speedCameraMobile'),
+        RoadEventType.speedCameraMobile);
+    expect(RoadEventType.fromName('redLightCamera'),
+        RoadEventType.redLightCamera);
+    expect(
+        RoadEventType.fromName('averageSpeedCamera'),
+        RoadEventType.averageSpeedCamera);
+    expect(RoadEventType.fromName('nieznany'), RoadEventType.police);
+    expect(RoadEventType.speedCameraStationary.isCamera, isTrue);
+    expect(RoadEventType.redLightCamera.isCamera, isTrue);
+    expect(RoadEventType.police.isCamera, isFalse);
+    expect(RoadEventType.accident.isCamera, isFalse);
+  });
+
+  test('RoadEvent: serializacja z limitem prędkości i potwierdzeniami', () {
+    final event = RoadEvent(
+      id: 'cam-1',
+      type: RoadEventType.speedCameraMobile,
+      lat: 52.1,
+      lon: 21.0,
+      description: 'Fotoradar mobilny, ograniczenie 50 km/h',
+      createdAt: DateTime(2025),
+      speedLimit: 50,
+      reporterId: 'user-42',
+      confirmations: 3,
+    );
+    final restored = RoadEvent.fromJson(event.toJson());
+    expect(restored.type, RoadEventType.speedCameraMobile);
+    expect(restored.speedLimit, 50);
+    expect(restored.reporterId, 'user-42');
+    expect(restored.confirmations, 3);
+    expect(restored.copyWith(confirmations: 5).confirmations, 5);
+  });
+
+  test('Komunikat nawigacyjny zawiera limit prędkości fotoradaru', () {
+    final event = RoadEvent(
+      id: 'cam-2',
+      type: RoadEventType.speedCameraStationary,
+      lat: 52.0,
+      lon: 21.0,
+      createdAt: DateTime(2025),
+      speedLimit: 70,
+    );
+    final alert = NavigationService.shared.alertFor(event, 500);
+    expect(alert, contains('fotoradar stacjonarny'));
+    expect(alert, contains('70 km/h'));
   });
 }

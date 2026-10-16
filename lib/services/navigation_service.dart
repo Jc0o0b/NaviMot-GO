@@ -15,15 +15,23 @@ class NavigationService {
   /// użytkownika".
   String alertFor(RoadEvent event, int meters) {
     final m = meters < 100 ? 100 : meters;
-    return 'Za $m m ${_eventPhrase(event.type)}';
+    final limit = event.speedLimit;
+    final limitText = limit == null ? '' : ', ograniczenie $limit km/h';
+    return 'Za $m m ${_eventPhrase(event.type)}$limitText';
   }
 
   String _eventPhrase(RoadEventType type) {
     switch (type) {
       case RoadEventType.police:
         return 'kontrola zgłoszona przez użytkownika';
-      case RoadEventType.speedCamera:
-        return 'fotoradar';
+      case RoadEventType.speedCameraStationary:
+        return 'fotoradar stacjonarny';
+      case RoadEventType.speedCameraMobile:
+        return 'fotoradar mobilny';
+      case RoadEventType.redLightCamera:
+        return 'kamera na czerwonym świetle';
+      case RoadEventType.averageSpeedCamera:
+        return 'odcinkowy pomiar prędkości';
       case RoadEventType.accident:
         return 'wypadek na drodze';
       case RoadEventType.obstacle:

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import '../models/important_place.dart';
+import '../models/point_of_interest.dart';
 import '../models/road_event.dart';
 import '../models/route.dart';
 import '../utils/route_geometry.dart';
 import '../widgets/event_widgets.dart' show eventIcon, roadEventColor;
+import '../widgets/poi_marker.dart' show poiColor, poiIcon;
 
 class OfflineRoutePreview extends StatelessWidget {
   final MotorcycleRoute route;
   final List<RoadEvent> events;
   final List<ImportantPlace> places;
+  final List<PointOfInterest> pois;
 
   /// Etykieta w rogu podglądu; null ukrywa etykietę.
   final String? label;
@@ -19,6 +22,7 @@ class OfflineRoutePreview extends StatelessWidget {
     required this.route,
     this.events = const [],
     this.places = const [],
+    this.pois = const [],
     this.label = 'Podgląd trasy (offline)',
   });
 
@@ -33,6 +37,7 @@ class OfflineRoutePreview extends StatelessWidget {
           intermediateWaypoints: route.intermediateWaypoints,
           events: events,
           places: places,
+          pois: pois,
           label: label,
         ),
       ),
@@ -45,6 +50,7 @@ class _RoutePreviewPainter extends CustomPainter {
   final List<LatLng> intermediateWaypoints;
   final List<RoadEvent> events;
   final List<ImportantPlace> places;
+  final List<PointOfInterest> pois;
   final String? label;
 
   _RoutePreviewPainter({
@@ -52,6 +58,7 @@ class _RoutePreviewPainter extends CustomPainter {
     this.intermediateWaypoints = const [],
     this.events = const [],
     this.places = const [],
+    this.pois = const [],
     this.label = 'Podgląd trasy (offline)',
   });
 
@@ -148,16 +155,16 @@ class _RoutePreviewPainter extends CustomPainter {
       }
     }
 
-    for (final e in events) {
-      final p = LatLng(e.lat, e.lon);
-      if (_inside(p, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
-        final o = project(p);
+    // Najpierw miejsca (POI), potem zdarzenia — żeby alerty/domy były na wierzchu.
+    for (final poi in pois) {
+      final pos = poi.coordinate;
+      if (_inside(pos, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
         _paintBadge(
           canvas,
-          o,
-          color: roadEventColor(e.type),
-          icon: eventIcon(e.type),
-          size: 14,
+          project(pos),
+          color: poiColor(poi.category),
+          icon: poiIcon(poi.category),
+          size: 13,
         );
       }
     }
@@ -172,6 +179,25 @@ class _RoutePreviewPainter extends CustomPainter {
           icon: Icons.star,
           size: 14,
         );
+      }
+    }
+
+    for (final e in events) {
+      final p = LatLng(e.lat, e.lon);
+      if (_inside(p, minLat, maxLat, minLon, maxLon, latSpan, lonSpan)) {
+        final o = project(p);
+        _paintBadge(
+          canvas,
+          o,
+          color: roadEventColor(e.type),
+          icon: eventIcon(e.type),
+          size: 15,
+        );
+        // Limit prędkości dla fotoradarów/kamer.
+        final limit = e.speedLimit;
+        if (limit != null) {
+          _paintSpeedChip(canvas, o, limit);
+        }
       }
     }
 
@@ -219,11 +245,38 @@ class _RoutePreviewPainter extends CustomPainter {
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));
   }
 
+  /// Maluje mały chip z limitem prędkości (np. "50") obok znacznika kamery.
+  void _paintSpeedChip(Canvas canvas, Offset badge, int limit) {
+    final text = '$limit';
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final w = tp.width + 8;
+    const h = 12.0;
+    // Chip w prawym-dolnym rogu znacznika.
+    final r = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+          badge.dx + 4, badge.dy + 4, w, h),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(r, Paint()..color = Colors.black.withValues(alpha: 0.85));
+    tp.paint(canvas, Offset(badge.dx + 8, badge.dy + 6));
+  }
+
   @override
   bool shouldRepaint(covariant _RoutePreviewPainter oldDelegate) =>
       oldDelegate.waypoints != waypoints ||
       oldDelegate.intermediateWaypoints != intermediateWaypoints ||
       oldDelegate.events != events ||
       oldDelegate.places != places ||
+      oldDelegate.pois != pois ||
       oldDelegate.label != label;
 }

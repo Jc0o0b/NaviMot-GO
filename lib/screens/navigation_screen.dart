@@ -443,7 +443,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
     if (nearest == null || nearestDist == double.infinity) return;
     final double speakAt;
     switch (nearest.type) {
-      case RoadEventType.speedCamera:
+      case RoadEventType.speedCameraStationary:
+      case RoadEventType.speedCameraMobile:
+      case RoadEventType.redLightCamera:
+      case RoadEventType.averageSpeedCamera:
         speakAt = 500;
       case RoadEventType.police:
       case RoadEventType.accident:

@@ -12,6 +12,7 @@ class POIProvider extends ChangeNotifier {
   PointOfInterest? _selectedPOI;
   int _generation = 0;
   bool _disposed = false;
+  String? _loadedRouteId;
 
   List<PointOfInterest> get pointsOfInterest => _pointsOfInterest;
   bool get isLoading => _isLoading;
@@ -19,9 +20,14 @@ class POIProvider extends ChangeNotifier {
   POICategory? get selectedCategory => _selectedCategory;
   PointOfInterest? get selectedPOI => _selectedPOI;
 
+  /// Identyfikator trasy, dla której POI są już pobrane (zapobiega
+  /// wielokrotnemu pobieraniu z kilku ekranów).
+  String? get loadedRouteId => _loadedRouteId;
+
   void loadPOIs(MotorcycleRoute route, {double radius = 10000}) {
     if (route.waypoints.isEmpty) return;
     final gen = ++_generation;
+    _loadedRouteId = route.id;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -43,6 +49,7 @@ class POIProvider extends ChangeNotifier {
 
   void loadPOIsNear(LatLng coordinate) {
     final gen = ++_generation;
+    _loadedRouteId = null;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

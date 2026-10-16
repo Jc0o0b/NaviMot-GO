@@ -1,6 +1,6 @@
 {
-  "version": "1.0.5",
-  "build_number": 6,
-  "changelog": "Odrzucanie niepewnych fixow GPS (WiFi/IP w przegladarce PC) - znacznik startuje od poczatku trasy zamiast blednego adresu.",
+  "version": "1.0.6",
+  "build_number": 7,
+  "changelog": "Podglad trasy: zgrupowane POI (hotele, restauracje, stacje paliw, punkty widokowe) z ikonami i informacjami oraz typy kamer (stacjonarne, mobilne, na czerwonym swietle, odcinkowy pomiar) z obowiazujacym limitem predkosci.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
