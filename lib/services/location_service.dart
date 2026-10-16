@@ -6,6 +6,16 @@ class LocationService {
   static Future<LatLng?> getCurrentLocation({
     Duration timeout = const Duration(seconds: 8),
   }) async {
+    final pos = await getCurrentFix(timeout: timeout);
+    if (pos == null) return null;
+    return LatLng(pos.latitude, pos.longitude);
+  }
+
+  /// Zwraca pełną pozycję (z dokładnością), żeby caller mógł odrzucić
+  /// niepewne fixy (np. geolokalizacja WiFi/IP w przeglądarce na PC).
+  static Future<Position?> getCurrentFix({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
     try {
       final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return null;
@@ -21,7 +31,7 @@ class LocationService {
         timeout,
         onTimeout: () => throw TimeoutException('GPS timeout'),
       );
-      return LatLng(pos.latitude, pos.longitude);
+      return pos;
     } catch (_) {
       return null;
     }

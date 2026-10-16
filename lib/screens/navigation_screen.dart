@@ -196,13 +196,13 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   Future<void> _startTracking() async {
     _simFallbackTimer = Timer(const Duration(seconds: 10), _maybeEnterDemo);
-    LatLng? location;
+    Position? fix;
     try {
-      location = await LocationService.getCurrentLocation();
+      fix = await LocationService.getCurrentFix();
     } catch (_) {}
     if (!mounted) return;
-    if (location != null) {
-      _handleInitialPosition(location);
+    if (fix != null && _isTrustworthyFix(fix)) {
+      _handleInitialPosition(LatLng(fix.latitude, fix.longitude));
     }
     try {
       _positionSub = Geolocator.getPositionStream(
@@ -218,6 +218,33 @@ class _NavigationScreenState extends State<NavigationScreen> {
         _startSimulation();
       }
     }
+  }
+
+  /// Odrzuca niepewne fixy GPS — typowo geolokalizację WiFi/IP w
+  /// przeglądarce na PC, która potrafi wskazać adres kilka bloków obok.
+  /// Zasada: ufamy fixowi, jeśli jest wystarczająco dokładny ALBO leży
+  /// blisko naszej trasy (wtedy nawet szeroki promień nie przesunie
+  /// znacznika poza planowaną trasę).
+  bool _isTrustworthyFix(Position fix) {
+    final acc = fix.accuracy;
+    final hasAccuracy = acc.isFinite && acc > 0;
+    if (hasAccuracy && acc <= 60) return true;
+
+    final p = LatLng(fix.latitude, fix.longitude);
+    final pts = _route.waypoints;
+    if (pts.length < 2) return hasAccuracy && acc <= 150;
+
+    // Bliskość do trasy liczona odległością do najbliższego punktu geometrii.
+    final snapped = _snapToRoute(p);
+    final distToRoute = _distanceBetween(p, snapped);
+    if (distToRoute <= 120) return true;
+
+    // Ostatnia deska: fix przy samym początku/celu trasy (start nawigacji
+    // z adresu domowego) — nawet słaby fix nie oddali znacznika od startu.
+    if (_distanceBetween(p, pts.first) <= 150) return true;
+    if (_distanceBetween(p, pts.last) <= 150) return true;
+
+    return false;
   }
 
   void _handleInitialPosition(LatLng location) {
@@ -305,6 +332,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
   void _onPosition(Position pos) {
     if (!mounted) return;
+    if (!_isTrustworthyFix(pos)) return;
     final real = LatLng(pos.latitude, pos.longitude);
     final snapped = _snapToRoute(real);
     final realToRoute = _distanceBetween(real, snapped);

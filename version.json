@@ -1,6 +1,6 @@
 {
-  "version": "1.0.4",
-  "build_number": 5,
-  "changelog": "Powrot do rzeczywistej pozycji GPS bez wymuszonego snapu.",
+  "version": "1.0.5",
+  "build_number": 6,
+  "changelog": "Odrzucanie niepewnych fixow GPS (WiFi/IP w przegladarce PC) - znacznik startuje od poczatku trasy zamiast blednego adresu.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
