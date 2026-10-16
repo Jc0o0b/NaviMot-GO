@@ -33,7 +33,15 @@ class POIProvider extends ChangeNotifier {
     notifyListeners();
 
     POIService.shared
-        .fetchPOIsAlongRoute(route.waypoints, radius: radius)
+        .fetchPOIsAlongRoute(
+      route.waypoints,
+      radius: radius,
+      onUpdate: (pois) {
+        if (_disposed || gen != _generation) return;
+        _pointsOfInterest = pois;
+        notifyListeners();
+      },
+    )
         .then((pois) {
       if (_disposed || gen != _generation) return;
       _pointsOfInterest = pois;

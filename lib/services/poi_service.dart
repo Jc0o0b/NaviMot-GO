@@ -29,6 +29,7 @@ class POIService {
   Future<List<PointOfInterest>> fetchPOIsAlongRoute(
     List<LatLng> waypoints, {
     double radius = 10000,
+    void Function(List<PointOfInterest>)? onUpdate,
   }) async {
     if (waypoints.isEmpty) return [];
 
@@ -45,21 +46,48 @@ class POIService {
 
     // Uzupełnienie z Overpass (restauracje, stacje, noclegi, malownicze drogi).
     // Best-effort: nie blokuje i nie psuje wyniku offline.
+    final base = _limit(result.values.toList(), waypoints, radius);
+
+    // Uzupełnienie z Overpass (restauracje, stacje, noclegi, malownicze drogi)
+    // dociągamy w tle — nie blokuje pokazania miejsc z bazy offline.
+    if (onUpdate != null) {
+      unawaited(_enrichFromOverpass(
+        waypoints,
+        Map<String, PointOfInterest>.from(result),
+        radius,
+        onUpdate,
+      ));
+    }
+    return base;
+  }
+
+  Future<void> _enrichFromOverpass(
+    List<LatLng> waypoints,
+    Map<String, PointOfInterest> base,
+    double radius,
+    void Function(List<PointOfInterest>) onUpdate,
+  ) async {
     try {
       final samples = _samplePoints(waypoints, 3);
       final query = _buildQuery(samples, radius: radius);
       final live = await _fetchOverpass(query);
       final maxCount = markerCountForRoute(waypoints);
       final best = _selectBest(live, waypoints, radius: radius, maxCount: maxCount);
+      final merged = Map<String, PointOfInterest>.from(base);
       for (final p in best) {
-        result.putIfAbsent(p.id, () => p);
+        merged.putIfAbsent(p.id, () => p);
       }
+      onUpdate(_limit(merged.values.toList(), waypoints, radius));
     } catch (_) {
-      // Overpass niedostępny — pomijamy, dane offline już są.
+      // Overpass niedostępny — zostaje wynik offline.
     }
+  }
 
-    // Zwracamy najwyżej markerCountForRoute miejsc (offline + ewentualne z sieci).
-    final all = result.values.toList();
+  List<PointOfInterest> _limit(
+    List<PointOfInterest> all,
+    List<LatLng> waypoints,
+    double radius,
+  ) {
     final maxCount = markerCountForRoute(waypoints);
     if (all.length <= maxCount) return all;
     return _selectBest(all, waypoints, radius: radius, maxCount: maxCount);

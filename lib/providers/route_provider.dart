@@ -28,6 +28,7 @@ class RouteProvider extends ChangeNotifier {
   LatLng? _endLocation;
   final List<LatLng> _intermediateWaypoints = [];
   int _planGeneration = 0;
+  int _cameraGeneration = 0;
 
   RouteProvider() {
     _loadSavedRoutes();
@@ -183,12 +184,21 @@ class RouteProvider extends ChangeNotifier {
   }
 
   Future<void> _loadRouteCameras(MotorcycleRoute route) async {
+    final gen = ++_cameraGeneration;
     try {
-      final cameras =
-          await CameraService.shared.camerasForRoute(route.waypoints);
-      if (_currentRoute?.id != route.id) return;
-      _routeCameras = cameras;
-      notifyListeners();
+      final cameras = await CameraService.shared.camerasForRoute(
+        route.waypoints,
+        onUpdate: (updated) {
+          if (gen == _cameraGeneration && _currentRoute?.id == route.id) {
+            _routeCameras = updated;
+            notifyListeners();
+          }
+        },
+      );
+      if (gen == _cameraGeneration && _currentRoute?.id == route.id) {
+        _routeCameras = cameras;
+        notifyListeners();
+      }
     } catch (_) {}
     try {
       final limits =

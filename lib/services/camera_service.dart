@@ -33,7 +33,10 @@ class CameraService {
   final Map<String, DateTime> _cacheTime = {};
   DateTime _lastFetch = DateTime.fromMillisecondsSinceEpoch(0);
 
-  Future<List<RoadEvent>> camerasForRoute(List<LatLng> waypoints) async {
+  Future<List<RoadEvent>> camerasForRoute(
+    List<LatLng> waypoints, {
+    void Function(List<RoadEvent>)? onUpdate,
+  }) async {
     if (waypoints.length < 2) return const [];
 
     // Źródło podstawowe: wbudowana baza offline — zawsze działa, bez internetu.
@@ -54,9 +57,25 @@ class CameraService {
         );
       }
     }
+    final base = result.values.toList();
 
-    // Uzupełnienie z Overpass (kamery spoza bazy / świeższe tagi).
-    // Best-effort: nie blokuje i nie psuje wyniku offline.
+    // Świeże dane z OSM (Overpass) dociągamy w tle i przekazujemy przez
+    // [onUpdate] — sieć nigdy nie blokuje pokazania kamer z bazy offline.
+    if (onUpdate != null) {
+      unawaited(_enrichFromOverpass(
+        waypoints,
+        Map<String, RoadEvent>.from(result),
+        onUpdate,
+      ));
+    }
+    return base;
+  }
+
+  Future<void> _enrichFromOverpass(
+    List<LatLng> waypoints,
+    Map<String, RoadEvent> base,
+    void Function(List<RoadEvent>) onUpdate,
+  ) async {
     try {
       double minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
       for (final p in waypoints) {
@@ -75,17 +94,17 @@ class CameraService {
         }
         bboxCameras = fetched ?? const <RoadEvent>[];
       }
+      final merged = Map<String, RoadEvent>.from(base);
       for (final e in bboxCameras) {
         if (distanceToRoute(LatLng(e.lat, e.lon), waypoints) <=
             _maxDistanceToRoute) {
-          result.putIfAbsent(e.id, () => e);
+          merged.putIfAbsent(e.id, () => e);
         }
       }
+      onUpdate(merged.values.toList());
     } catch (_) {
-      // Overpass niedostępny — pomijamy, dane offline już są.
+      // Overpass niedostępny — zostaje wynik offline.
     }
-
-    return result.values.toList();
   }
 
   String _bboxKey(
