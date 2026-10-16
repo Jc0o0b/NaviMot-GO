@@ -119,7 +119,7 @@ class _RoutePreviewPainter extends CustomPainter {
     final end = pts.last;
 
     canvas.drawCircle(start, 8, Paint()..color = Colors.white);
-    canvas.drawCircle(start, 5, Paint()..color = Colors.green.shade600);
+    canvas.drawCircle(start, 5, Paint()..color = const Color(0xFFFF5722));
 
     canvas.drawCircle(end, 8, Paint()..color = Colors.white);
     final flag = Path()
