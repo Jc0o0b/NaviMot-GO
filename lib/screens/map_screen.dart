@@ -104,7 +104,9 @@ class _MapScreenState extends State<MapScreen>
           mapController: _mapController,
           options: MapOptions(
             initialCenter: route?.waypoints.isNotEmpty == true
-                ? _centerOf(route!.waypoints)
+                ? (context.watch<RouteProvider>().currentRoute?.waypoints.isNotEmpty == true
+                    ? context.watch<RouteProvider>().currentRoute!.waypoints.first
+                    : _centerOf(route!.waypoints))
                 : const LatLng(52.2297, 21.0122),
             initialZoom: route?.waypoints.isNotEmpty == true ? 9.0 : 6.0,
             onTap: _handleMapTap,
@@ -139,12 +141,6 @@ class _MapScreenState extends State<MapScreen>
               ),
               MarkerLayer(
                 markers: [
-                  if (route.waypoints.isNotEmpty && _currentLocation == null)
-                    _buildMarker(
-                        route.waypoints.first, Icons.motorcycle, Colors.green)
-                  else if (route.waypoints.isNotEmpty)
-                    _buildMarker(
-                        route.waypoints.first, Icons.location_pin, Colors.green),
                   if (route.waypoints.length > 1)
                     _buildMarker(route.waypoints.last, Icons.flag, Colors.red),
                 ],

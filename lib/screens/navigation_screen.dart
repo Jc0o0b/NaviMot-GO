@@ -743,15 +743,6 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   if (_route.waypoints.isNotEmpty)
                     MarkerLayer(
                       markers: [
-                        if (_currentLocation == null ||
-                            Distance().distance(_currentLocation!, _route.waypoints.first) > 100)
-                          Marker(
-                            point: _route.waypoints.first,
-                            width: 32,
-                            height: 32,
-                            child: const Icon(Icons.motorcycle,
-                                color: Colors.green, size: 28),
-                          ),
                         Marker(
                           point: _route.waypoints.last,
                           width: 32,

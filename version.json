@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "build_number": 1,
-  "changelog": "Reset numeracji wersji. Poprawka markerów w nawigacji: unikaj duplikowania znacznika startu przy aktualnej lokalizacji.",
+  "version": "1.0.1",
+  "build_number": 2,
+  "changelog": "Naprawa podwójnych markerów w nawigacji: zielony znacznik startu usuniêty; pozosta³ wy³¹cznie poruszaj¹cy siê znacznik motocykla (kolor akcentu).",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
