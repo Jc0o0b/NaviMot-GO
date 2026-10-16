@@ -1,6 +1,6 @@
 {
-  "version": "1.0.3",
-  "build_number": 4,
-  "changelog": "Marker motocykla przesuwa siê teraz po wyznaczonej trasie (snapped to route), zgodnie z proœb¹.",
+  "version": "1.0.4",
+  "build_number": 5,
+  "changelog": "Powrot do rzeczywistej pozycji GPS bez wymuszonego snapu.",
   "apk_url": "https://jc0o0b.github.io/NaviMot-GO/app-release.apk"
 }
